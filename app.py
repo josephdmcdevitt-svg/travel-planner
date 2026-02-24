@@ -709,6 +709,101 @@ def build_itinerary(recommended, prefs):
     }
 
 
+def build_single_city_itinerary(city_name, city_data, trip_days=10):
+    """Build a sample itinerary for a single city, reusing build_itinerary()."""
+    recommended = [{
+        "country": city_data["country"],
+        "region": city_data["region"],
+        "score": 100,
+        "cities": [{"name": city_name, "data": city_data, "score": 100}],
+    }]
+    prefs = {
+        "days": trip_days,
+        "interests": city_data.get("tags", [])[:5],
+        "group": "Solo",
+        "pace": "Moderate",
+        "budget": 3000,
+        "departure_city": "",
+    }
+    return build_itinerary(recommended, prefs)
+
+
+# Fun facts for cities (fallback generates from description)
+CITY_FUN_FACTS = {
+    "Tokyo": "Tokyo has more Michelin-starred restaurants than any other city in the world.",
+    "Kyoto": "Kyoto has over 2,000 temples and shrines — more than you could visit in a lifetime.",
+    "Osaka": "Osaka is called 'Japan's Kitchen' — locals greet each other with 'have you eaten yet?'",
+    "Hiroshima": "Hiroshima rebuilt itself from total devastation and is now a UNESCO City of Peace.",
+    "Nara": "Over 1,200 wild deer roam freely through Nara — they're considered sacred messengers of the gods.",
+    "Hakone": "On clear days, Hakone offers picture-perfect views of Mount Fuji reflected in Lake Ashi.",
+    "Sapporo": "Sapporo's Snow Festival attracts over 2 million visitors to see massive snow and ice sculptures.",
+    "Bangkok": "Bangkok's full ceremonial name is 168 letters long — the longest city name in the world.",
+    "Chiang Mai": "Chiang Mai has over 300 Buddhist temples within the city and surrounding area.",
+    "Bali": "Bali has more than 20,000 temples — there's at least one in every home and village.",
+    "Seoul": "Seoul's subway system is one of the most advanced in the world, with heated seats and free wifi.",
+    "Delhi": "Delhi's Qutub Minar is the tallest brick minaret in the world at 73 meters.",
+    "Hanoi": "Hanoi's Old Quarter streets are named after the goods historically sold on them.",
+    "Ho Chi Minh City": "Over 5 million motorbikes navigate Ho Chi Minh City's streets every day.",
+    "Paris": "The Eiffel Tower was supposed to be temporary — it was meant to be dismantled after 20 years.",
+    "Rome": "Rome's Trevi Fountain collects about $1.5 million in coins every year, donated to charity.",
+    "Florence": "Florence's Duomo was the largest dome in the world for over 500 years.",
+    "Barcelona": "Gaudi's Sagrada Familia has been under construction since 1882 — over 140 years.",
+    "London": "The London Underground is the oldest subway system in the world, opened in 1863.",
+    "Istanbul": "Istanbul is the only city in the world that spans two continents — Europe and Asia.",
+    "Marrakech": "Marrakech's Jemaa el-Fnaa square transforms every night into an open-air restaurant for thousands.",
+    "Cape Town": "Table Mountain is one of the oldest mountains on Earth — roughly 600 million years old.",
+    "Cusco": "Cusco sits at 3,400m elevation — it takes a day or two to adjust to the thin air.",
+    "Mexico City": "Mexico City is slowly sinking — it's built on a drained lakebed and sinks up to 50cm per year.",
+    "Sydney": "Sydney Harbour Bridge is nicknamed 'The Coathanger' by locals due to its arch shape.",
+    "Rio de Janeiro": "Christ the Redeemer's arms stretch 28 meters wide — like giving the city a giant hug.",
+    "Buenos Aires": "Buenos Aires has the widest avenue in the world — 9 de Julio Avenue has 16 lanes.",
+    "Santorini": "Santorini is actually the rim of a massive volcanic caldera that erupted 3,600 years ago.",
+    "Amsterdam": "Amsterdam has more bicycles than people — roughly 881,000 bikes for 821,000 residents.",
+    "Prague": "Prague Castle is the largest ancient castle complex in the world at 70,000 square meters.",
+    "Budapest": "Budapest has the largest thermal water cave system in the world beneath the city.",
+    "Lisbon": "Lisbon is one of the oldest cities in Europe — older than Rome by several centuries.",
+    "Berlin": "Berlin has more bridges than Venice — roughly 960 compared to Venice's 400.",
+    "Dubrovnik": "Dubrovnik's city walls are nearly 2km long and up to 25 meters high.",
+    "Medellin": "Medellin went from one of the most dangerous cities to winning 'Most Innovative City' in 2013.",
+    "Petra": "Petra was lost to the Western world for nearly 500 years until rediscovered in 1812.",
+    "Reykjavik": "Reykjavik is powered almost entirely by geothermal energy from underground hot springs.",
+    "Singapore": "Singapore is both a city AND a country — one of only three city-states in the world.",
+    "Hong Kong": "Hong Kong has more skyscrapers than any other city on Earth — over 480.",
+    "Dubai": "Dubai's Burj Khalifa is so tall that you can watch the sunset twice — once from the base and again from the top.",
+    "Machu Picchu": "Machu Picchu was built without mortar — the stones fit together so tightly that a knife blade can't fit between them.",
+    "Venice": "Venice is built on 118 small islands connected by over 400 bridges.",
+    "Cappadocia": "Cappadocia's underground cities could shelter up to 20,000 people and their livestock.",
+    "Galapagos": "The Galapagos tortoise can live over 175 years — the longest of any vertebrate.",
+    "Zanzibar": "Zanzibar was once the world's largest producer of cloves — you can still smell them in the air.",
+    "Siem Reap": "Angkor Wat is the largest religious monument ever built — it covers 162.6 hectares.",
+    "Luang Prabang": "Every morning at dawn, hundreds of monks walk the streets collecting alms in an unbroken tradition.",
+    "Varanasi": "Varanasi is believed to be one of the oldest continuously inhabited cities, possibly 5,000 years old.",
+    "Queenstown": "Queenstown is the birthplace of commercial bungee jumping — it started here in 1988.",
+    "Bruges": "Bruges has an underground pipeline that carries beer 3km from the brewery to the bottling plant.",
+    "Tbilisi": "Georgia is one of the oldest winemaking regions on Earth — they've been making wine for 8,000 years.",
+    "Uyuni": "Bolivia's Salar de Uyuni is so flat that it's used to calibrate satellites from space.",
+    "Atacama": "Parts of the Atacama Desert haven't seen rain in over 500 years.",
+    "Torres del Paine": "The granite towers of Torres del Paine took 12 million years to form.",
+    "Chefchaouen": "Nobody knows for sure why Chefchaouen is painted blue — theories range from mosquito repellent to spiritual tradition.",
+    "Hoi An": "On the 14th day of each lunar month, Hoi An turns off its electric lights and glows with lanterns only.",
+    "Bagan": "Bagan once had over 10,000 temples — about 2,200 still survive across the ancient plain.",
+    "Fes": "The tanneries of Fes have been operating the same way for nearly 1,000 years.",
+    "Jaipur": "Jaipur was painted pink in 1876 to welcome Prince Albert — and the color stuck.",
+    "Udaipur": "Udaipur's Lake Palace appears to float on the water and was used as a James Bond filming location.",
+    "Krakow": "A trumpet call plays from Krakow's St. Mary's Church tower every hour — and stops mid-note, honoring a 13th-century watchman shot by invaders.",
+    "Valletta": "Valletta is the smallest national capital in the EU — you can walk across it in about 15 minutes.",
+    "Colombo": "Sri Lanka is one of the world's largest tea producers — try a cup of fresh Ceylon tea.",
+    "Kathmandu": "Kathmandu Valley has 7 UNESCO World Heritage Sites in an area smaller than most cities.",
+    "La Paz": "La Paz has the highest commercial airport in the world at over 4,000 meters elevation.",
+    "Oaxaca": "Oaxaca has more varieties of mole sauce than anywhere else — at least 7 distinct types.",
+    "Tulum": "Tulum's cliff-top Mayan ruins are one of the last cities built by the Maya, dating to around 1200 AD.",
+    "Rotorua": "Rotorua smells like sulfur due to its geothermal activity — locals call it 'Sulphur City.'",
+    "Serengeti": "The Great Migration sees over 1.5 million wildebeest cross the Serengeti every year.",
+    "Cairo": "The Great Pyramid of Giza was the tallest man-made structure for over 3,800 years.",
+    "Luxor": "Luxor contains roughly one-third of all the world's ancient monuments.",
+}
+
+
 def generate_country_reason(country_info, prefs):
     user_tags = prefs.get("interests", [])
     city_names = [c["name"] for c in country_info["cities"]]
@@ -1398,23 +1493,11 @@ def render_city_detail(city_name, city_data, context="explore", prefs=None, trip
             acts_html += f'<div class="activity-rank"><span class="activity-number">{i}</span> {a}</div>'
         st.markdown(acts_html, unsafe_allow_html=True)
 
-    # Food & Drink + Things to Do (two columns)
-    col1, col2 = st.columns(2)
-    with col1:
-        if local_food:
-            st.markdown('<h4>🍜 Local Food</h4>', unsafe_allow_html=True)
-            food_html = "".join(f'<span class="food-drink-item">{f}</span>' for f in local_food)
-            st.markdown(food_html, unsafe_allow_html=True)
-        if local_drink:
-            st.markdown('<h4>🍹 Local Drinks</h4>', unsafe_allow_html=True)
-            drink_html = "".join(f'<span class="drink-item">{d}</span>' for d in local_drink)
-            st.markdown(drink_html, unsafe_allow_html=True)
-
-    with col2:
-        if things:
-            st.markdown('<h4>📋 Things To Do</h4>', unsafe_allow_html=True)
-            for t in things:
-                st.markdown(f'- {t}')
+    # Things to Do
+    if things:
+        st.markdown('<h4>📋 Things To Do</h4>', unsafe_allow_html=True)
+        for t in things:
+            st.markdown(f'- {t}')
 
     # Cost summary
     st.markdown('<h4>💰 Cost Summary</h4>', unsafe_allow_html=True)
@@ -1428,13 +1511,55 @@ def render_city_detail(city_name, city_data, context="explore", prefs=None, trip
         unsafe_allow_html=True,
     )
 
-    # Best months + festivals
-    st.markdown('<h4>📅 Best Months & Festivals</h4>', unsafe_allow_html=True)
-    st.markdown(f'**Best months to visit:** {best_months}')
-    if festivals:
-        st.markdown(f'**Festivals:** {" · ".join(festivals)}')
-    else:
-        st.markdown('*No major festivals listed*')
+    # Local Flavors spotlight + fun fact
+    st.markdown('<h4>🍽️ Local Flavors</h4>', unsafe_allow_html=True)
+    flavors_html = ""
+    for f in local_food:
+        flavors_html += f'<span class="food-drink-item">{f}</span>'
+    for d in local_drink:
+        flavors_html += f'<span class="drink-item">{d}</span>'
+    st.markdown(f'<div style="margin-bottom:12px;">{flavors_html}</div>', unsafe_allow_html=True)
+
+    # Fun fact
+    fun_fact = CITY_FUN_FACTS.get(city_name)
+    if not fun_fact:
+        fun_fact = f"{city_name} is a unique destination in {country} — explore it and make your own discoveries."
+    st.markdown(
+        f'<div style="background:linear-gradient(135deg,#f0f4ff,#e8eeff);border-radius:12px;'
+        f'padding:14px 18px;margin:10px 0;border-left:4px solid #4361ee;">'
+        f'<strong>🎲 Fun Fact:</strong> {fun_fact}</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Best months
+    st.markdown(f'<div style="margin:8px 0;color:#555;"><strong>📅 Best months to visit:</strong> {best_months}</div>',
+                unsafe_allow_html=True)
+
+    # Sample itinerary (explore context only)
+    if context == "explore":
+        st.markdown('<h4>📅 Sample 10-Day Itinerary</h4>', unsafe_allow_html=True)
+        sample = build_single_city_itinerary(city_name, city_data, trip_days=10)
+        for day in sample["itinerary"]:
+            acts_html = ""
+            for a in day["activities"]:
+                acts_html += (
+                    f'<div class="activity-item">'
+                    f'<span class="activity-time">{a["time"]}</span> {a["activity"]}'
+                    f'</div>'
+                )
+            st.markdown(
+                f'<div class="day-card">'
+                f'<div class="day-title">{day["title"]}</div>'
+                f'{acts_html}</div>',
+                unsafe_allow_html=True,
+            )
+        st.markdown(
+            f'<div style="background:#f0f4ff;border-radius:12px;padding:16px;margin-top:12px;">'
+            f'<strong>Estimated 10-day budget (solo):</strong> '
+            f'~<strong style="color:#4361ee;font-size:1.2rem;">${sample["total_cost"]:,}</strong>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
     # Results-only section: why recommended + budget estimate
     if context == "results" and prefs:
@@ -1583,10 +1708,77 @@ def explore_screen():
         data = CITIES[selected_city]
         render_city_detail(selected_city, data, context="explore")
 
-        if st.button(f"🗺️ Plan a trip to {selected_city}!", key="plan_trip_explore", type="primary"):
-            st.session_state.prefs["region_pref"] = [data["region"]]
-            st.session_state.screen = "wizard"
-            st.session_state.wizard_step = 1
+        # ── Quick-plan section ────────────────────────────────────────────
+        st.markdown("---")
+        st.markdown(f"### ✈️ Plan a Trip to {selected_city}")
+
+        qp1, qp2 = st.columns(2)
+        with qp1:
+            departure_city = st.text_input(
+                "Departure city",
+                value=st.session_state.get("explore_departure", ""),
+                placeholder="e.g. New York, London, Tokyo…",
+                key="explore_departure_input",
+            )
+        with qp2:
+            trip_days = st.number_input(
+                "Trip length (days)", min_value=3, max_value=30, value=10,
+                key="explore_trip_days",
+            )
+
+        # Auto multi-country for 10+ days
+        multi_country = trip_days > 10
+
+        if st.button(
+            f"🗺️ Plan a {trip_days}-day trip to {selected_city}!",
+            key="plan_trip_explore",
+            type="primary",
+        ):
+            # Build default preferences
+            quick_prefs = {
+                "days": trip_days,
+                "budget": 3000,
+                "group": "Solo",
+                "pace": "Moderate",
+                "interests": data.get("tags", [])[:5],
+                "departure_city": departure_city.strip(),
+                "region_pref": [data["region"]],
+                "multi_country": multi_country,
+                "safety_priority": 50,
+                "travel_month": None,
+                "must_have_experiences": [],
+            }
+            st.session_state.prefs = quick_prefs
+
+            # Build recommended list — single city or multi via recommend()
+            if multi_country:
+                # Use the full recommend engine so it picks nearby countries
+                recommended = recommend(quick_prefs)
+                # Make sure our selected city is included
+                found = False
+                for grp in recommended:
+                    for c in grp["cities"]:
+                        if c["name"] == selected_city:
+                            found = True
+                            break
+                if not found and recommended:
+                    recommended[0]["cities"].insert(0, {
+                        "name": selected_city,
+                        "data": data,
+                        "score": 100,
+                    })
+            else:
+                recommended = [{
+                    "country": data["country"],
+                    "region": data["region"],
+                    "score": 100,
+                    "cities": [{"name": selected_city, "data": data, "score": 100}],
+                }]
+
+            results = build_itinerary(recommended, quick_prefs)
+            results["recommended"] = recommended
+            st.session_state.results = results
+            st.session_state.screen = "results"
             st.rerun()
 
 
