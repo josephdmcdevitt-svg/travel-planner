@@ -332,7 +332,9 @@ def score_city(city_name, city_data, prefs):
         score -= 10
 
     # ── Comfort match ──
-    user_comfort = prefs.get("comfort", 3)
+    # User comfort is 1-100, city comfort is 1-5. Normalize user to 1-5 scale for comparison.
+    user_comfort_raw = prefs.get("comfort", 50)
+    user_comfort = 1 + (user_comfort_raw - 1) * 4 / 99  # map 1-100 to 1-5
     city_comfort = city_data.get("comfort", 3)
     if city_comfort >= user_comfort:
         score += 8
@@ -340,10 +342,10 @@ def score_city(city_name, city_data, prefs):
         score -= (user_comfort - city_comfort) * 5
 
     # ── Adventure level ──
-    adventure = prefs.get("adventure", 3)
-    if adventure >= 4 and any(t in city_tags for t in ["hiking", "wildlife", "culture"]):
+    adventure = prefs.get("adventure", 50)
+    if adventure >= 70 and any(t in city_tags for t in ["hiking", "wildlife", "culture"]):
         score += 5
-    if adventure <= 2 and city_comfort >= 4:
+    if adventure <= 30 and city_comfort >= 4:
         score += 5
 
     # ── Flight penalty / jet lag ──
@@ -369,22 +371,22 @@ def score_city(city_name, city_data, prefs):
         score += 10
 
     # ── NEW: Language comfort (+/- 8) ──
-    lang_comfort = prefs.get("language_comfort", 3)
+    lang_comfort = prefs.get("language_comfort", 50)
     country = city_data.get("country", "")
     is_english = country in ENGLISH_COUNTRIES
-    if lang_comfort <= 2 and not is_english:
+    if lang_comfort <= 30 and not is_english:
         score -= 8
-    elif lang_comfort >= 4 and not is_english:
+    elif lang_comfort >= 70 and not is_english:
         score += 3  # adventurous linguist bonus
 
     # ── NEW: Safety match (+/- 10) ──
-    safety_prio = prefs.get("safety_priority", 3)
+    safety_prio = prefs.get("safety_priority", 50)
     city_safety = city_data.get("safety", 3)
-    if safety_prio >= 4 and city_safety <= 2:
+    if safety_prio >= 70 and city_safety <= 2:
         score -= 10
-    elif safety_prio >= 4 and city_safety >= 4:
+    elif safety_prio >= 70 and city_safety >= 4:
         score += 8
-    elif safety_prio <= 2:
+    elif safety_prio <= 30:
         score += 2  # doesn't care, slight bonus for adventurous places
 
     # ── NEW: City size preference (+/- 8) ──
@@ -434,19 +436,19 @@ def score_city(city_name, city_data, prefs):
         score += 2
 
     # ── NEW: Crowd tolerance (+/- 8) ──
-    crowd_tolerance = prefs.get("crowd_tolerance", 3)
+    crowd_tolerance = prefs.get("crowd_tolerance", 50)
     city_crowd = city_data.get("crowd_level", 3)
-    if crowd_tolerance <= 2 and city_crowd >= 4:
+    if crowd_tolerance <= 30 and city_crowd >= 4:
         score -= 8
-    elif crowd_tolerance >= 4 and city_crowd >= 4:
+    elif crowd_tolerance >= 70 and city_crowd >= 4:
         score += 3
 
     # ── NEW: Wifi needs (+/- 8) ──
-    wifi_need = prefs.get("wifi_needs", 3)
+    wifi_need = prefs.get("wifi_needs", 50)
     city_wifi = city_data.get("wifi", 3)
-    if wifi_need >= 4 and city_wifi <= 2:
+    if wifi_need >= 70 and city_wifi <= 2:
         score -= 8
-    elif wifi_need >= 4 and city_wifi >= 4:
+    elif wifi_need >= 70 and city_wifi >= 4:
         score += 5
 
     # ── NEW: Vegetarian / dietary (+/- 5) ──
@@ -464,13 +466,13 @@ def score_city(city_name, city_data, prefs):
         score += 5
 
     # ── NEW: Cultural immersion (+5) ──
-    immersion = prefs.get("cultural_immersion", 3)
-    if immersion >= 4 and "culture" in city_tags:
+    immersion = prefs.get("cultural_immersion", 50)
+    if immersion >= 70 and "culture" in city_tags:
         score += 5
 
     # ── NEW: Shopping importance (+5) ──
-    shopping = prefs.get("shopping_importance", 3)
-    if shopping >= 4 and "shopping" in city_tags:
+    shopping = prefs.get("shopping_importance", 50)
+    if shopping >= 70 and "shopping" in city_tags:
         score += 5
 
     # ── NEW: Fitness / hiking match (+/- 5) ──
@@ -499,15 +501,15 @@ def score_city(city_name, city_data, prefs):
         pass  # no effect
 
     # ── NEW: Religious site interest ──
-    religious = prefs.get("religious_interest", 3)
-    if religious >= 4 and "temples" in city_tags:
+    religious = prefs.get("religious_interest", 50)
+    if religious >= 70 and "temples" in city_tags:
         score += 5
 
     # ── NEW: Coast vs mountain slider ──
-    coast_mountain = prefs.get("coast_vs_mountain", 3)  # 1=coast, 5=mountain
-    if coast_mountain <= 2 and city_terrain in ("coastal", "island"):
+    coast_mountain = prefs.get("coast_vs_mountain", 50)  # 1=coast, 100=mountain
+    if coast_mountain <= 30 and city_terrain in ("coastal", "island"):
         score += 5
-    elif coast_mountain >= 4 and city_terrain == "mountain":
+    elif coast_mountain >= 70 and city_terrain == "mountain":
         score += 5
 
     return score
@@ -892,7 +894,7 @@ def wizard_screen():
     # ── Step 1: Trip Basics ──
     if step == 1:
         st.subheader("✈️ Trip Basics")
-        budget = st.slider("Total budget (USD)", 500, 25000, prefs.get("budget", 3000), step=250,
+        budget = st.slider("Total budget (USD)", 500, 50000, prefs.get("budget", 3000), step=250,
                            help="Your total trip budget including accommodation, food, activities, and local transport")
         days = st.slider("Trip length (days)", 3, 60, prefs.get("days", 10))
         departure = st.text_input("Departure city", value=prefs.get("departure_city", ""),
@@ -931,10 +933,10 @@ def wizard_screen():
     # ── Step 2: Travel Style ──
     elif step == 2:
         st.subheader("🧭 Travel Style")
-        adventure = st.slider("Adventure level", 1, 5, prefs.get("adventure", 3),
-                              help="1 = Very relaxed, stick to tourist areas · 5 = Off the beaten path, thrill-seeking")
-        labels = {1: "Very chill", 2: "Easygoing", 3: "Balanced", 4: "Adventurous", 5: "Full send"}
-        st.caption(f"You selected: **{labels[adventure]}**")
+        adventure = st.slider("Adventure level", 1, 100, prefs.get("adventure", 50),
+                              help="1 = Very relaxed, stick to tourist areas · 100 = Off the beaten path, thrill-seeking")
+        adv_label = "Very chill" if adventure <= 20 else "Easygoing" if adventure <= 40 else "Balanced" if adventure <= 60 else "Adventurous" if adventure <= 80 else "Full send"
+        st.caption(f"You selected: **{adv_label}**")
 
         pace = st.radio("Trip pace", ["Relaxed", "Moderate", "Packed"],
                         index=["Relaxed", "Moderate", "Packed"].index(prefs.get("pace", "Moderate")),
@@ -1047,9 +1049,9 @@ def wizard_screen():
                             index=fest_options.index(saved_fest),
                             horizontal=True)
 
-        religious = st.slider("Interest in religious/spiritual sites", 1, 5,
-                              prefs.get("religious_interest", 3),
-                              help="1 = Not interested · 5 = Very interested")
+        religious = st.slider("Interest in religious/spiritual sites", 1, 100,
+                              prefs.get("religious_interest", 50),
+                              help="1 = Not interested · 100 = Very interested")
 
         st.markdown("")
         lc, rc = st.columns([1, 1])
@@ -1069,11 +1071,10 @@ def wizard_screen():
     elif step == 5:
         st.subheader("🛏️ Comfort & Accommodation")
 
-        comfort = st.slider("Accommodation preference", 1, 5, prefs.get("comfort", 3),
-                            help="1 = Hostels & basic guesthouses · 5 = Luxury hotels & resorts")
-        comfort_labels = {1: "Hostels & dorms", 2: "Budget guesthouses", 3: "Nice hotels",
-                          4: "Boutique / upper-mid", 5: "Luxury resorts"}
-        st.caption(f"You selected: **{comfort_labels[comfort]}**")
+        comfort = st.slider("Accommodation preference", 1, 100, prefs.get("comfort", 50),
+                            help="1 = Hostels & basic guesthouses · 100 = Luxury hotels & resorts")
+        comfort_label = "Hostels & dorms" if comfort <= 20 else "Budget guesthouses" if comfort <= 40 else "Nice hotels" if comfort <= 60 else "Boutique / upper-mid" if comfort <= 80 else "Luxury resorts"
+        st.caption(f"You selected: **{comfort_label}**")
 
         transport = st.radio("Transport preference",
                              ["Local buses & trains", "Mix of local and private", "Private / taxi"],
@@ -1081,11 +1082,10 @@ def wizard_screen():
                              .index(prefs.get("transport", "Mix of local and private")),
                              horizontal=True)
 
-        food_adventure = st.slider("Food adventurousness", 1, 5, prefs.get("food_adventure", 3),
-                                   help="1 = Familiar food only · 5 = I'll eat anything from a street cart")
-        food_labels = {1: "Stick to what I know", 2: "Mildly curious", 3: "Open to trying things",
-                       4: "Adventurous eater", 5: "Feed me anything"}
-        st.caption(f"You selected: **{food_labels[food_adventure]}**")
+        food_adventure = st.slider("Food adventurousness", 1, 100, prefs.get("food_adventure", 50),
+                                   help="1 = Familiar food only · 100 = I'll eat anything from a street cart")
+        food_label = "Stick to what I know" if food_adventure <= 20 else "Mildly curious" if food_adventure <= 40 else "Open to trying things" if food_adventure <= 60 else "Adventurous eater" if food_adventure <= 80 else "Feed me anything"
+        st.caption(f"You selected: **{food_label}**")
 
         dietary_options = ["vegetarian", "vegan", "halal", "kosher", "gluten_free"]
         dietary_labels = {"vegetarian": "Vegetarian", "vegan": "Vegan", "halal": "Halal",
@@ -1096,8 +1096,8 @@ def wizard_screen():
                                   format_func=lambda x: dietary_labels[x],
                                   default=saved_dietary)
 
-        wifi = st.slider("Internet / wifi needs", 1, 5, prefs.get("wifi_needs", 3),
-                         help="1 = Don't need it · 5 = Must have reliable wifi")
+        wifi = st.slider("Internet / wifi needs", 1, 100, prefs.get("wifi_needs", 50),
+                         help="1 = Don't need it · 100 = Must have reliable wifi")
 
         fitness_options = ["low", "moderate", "high"]
         fitness_labels = {"low": "Low — prefer minimal walking", "moderate": "Moderate — can handle some hikes",
@@ -1159,11 +1159,10 @@ def wizard_screen():
                                   index=beach_options.index(saved_beach),
                                   horizontal=True)
 
-        coast_mountain = st.slider("Coast vs Mountain", 1, 5, prefs.get("coast_vs_mountain", 3),
-                                   help="1 = Prefer coast & beaches · 5 = Prefer mountains & highlands")
-        cm_labels = {1: "Coast lover", 2: "Leaning coastal", 3: "Both are great",
-                     4: "Leaning mountains", 5: "Mountain lover"}
-        st.caption(f"You selected: **{cm_labels[coast_mountain]}**")
+        coast_mountain = st.slider("Coast vs Mountain", 1, 100, prefs.get("coast_vs_mountain", 50),
+                                   help="1 = Prefer coast & beaches · 100 = Prefer mountains & highlands")
+        cm_label = "Coast lover" if coast_mountain <= 20 else "Leaning coastal" if coast_mountain <= 40 else "Both are great" if coast_mountain <= 60 else "Leaning mountains" if coast_mountain <= 80 else "Mountain lover"
+        st.caption(f"You selected: **{cm_label}**")
 
         st.markdown("")
         lc, rc = st.columns([1, 1])
@@ -1182,13 +1181,13 @@ def wizard_screen():
     elif step == 7:
         st.subheader("🤝 Social & Cultural")
 
-        lang_comfort = st.slider("Language barrier comfort", 1, 5,
-                                 prefs.get("language_comfort", 3),
-                                 help="1 = Only go where English is spoken · 5 = Love learning new languages")
+        lang_comfort = st.slider("Language barrier comfort", 1, 100,
+                                 prefs.get("language_comfort", 50),
+                                 help="1 = Only go where English is spoken · 100 = Love learning new languages")
 
-        immersion = st.slider("Cultural immersion level", 1, 5,
-                              prefs.get("cultural_immersion", 3),
-                              help="1 = Tourist-friendly spots · 5 = Live like a local")
+        immersion = st.slider("Cultural immersion level", 1, 100,
+                              prefs.get("cultural_immersion", 50),
+                              help="1 = Tourist-friendly spots · 100 = Live like a local")
 
         night_options = ["not_important", "nice_to_have", "important", "essential"]
         night_labels = {"not_important": "Not important", "nice_to_have": "Nice to have",
@@ -1200,9 +1199,9 @@ def wizard_screen():
                              index=night_options.index(saved_night),
                              horizontal=True)
 
-        crowd_tolerance = st.slider("Crowd / tourist tolerance", 1, 5,
-                                    prefs.get("crowd_tolerance", 3),
-                                    help="1 = Avoid crowds at all costs · 5 = Don't mind tourist hotspots")
+        crowd_tolerance = st.slider("Crowd / tourist tolerance", 1, 100,
+                                    prefs.get("crowd_tolerance", 50),
+                                    help="1 = Avoid crowds at all costs · 100 = Don't mind tourist hotspots")
 
         photo_options = ["casual", "enthusiast", "dedicated"]
         photo_labels = {"casual": "Casual — phone snaps", "enthusiast": "Enthusiast — good photos matter",
@@ -1232,8 +1231,8 @@ def wizard_screen():
     elif step == 8:
         st.subheader("🔒 Safety & Logistics")
 
-        safety = st.slider("Safety priority", 1, 5, prefs.get("safety_priority", 3),
-                           help="1 = I'm comfortable anywhere · 5 = Safety is my top priority")
+        safety = st.slider("Safety priority", 1, 100, prefs.get("safety_priority", 50),
+                           help="1 = I'm comfortable anywhere · 100 = Safety is my top priority")
 
         jet_options = ["doesnt_bother", "prefer_few", "minimize"]
         jet_labels = {"doesnt_bother": "Doesn't bother me",
@@ -1246,8 +1245,8 @@ def wizard_screen():
                            index=jet_options.index(saved_jet),
                            horizontal=True)
 
-        shopping = st.slider("Shopping importance", 1, 5, prefs.get("shopping_importance", 3),
-                             help="1 = Not interested · 5 = Shopping is a big part of my trip")
+        shopping = st.slider("Shopping importance", 1, 100, prefs.get("shopping_importance", 50),
+                             help="1 = Not interested · 100 = Shopping is a big part of my trip")
 
         st.markdown("")
         lc, rc = st.columns([1, 1])
