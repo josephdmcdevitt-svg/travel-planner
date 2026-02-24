@@ -262,6 +262,7 @@ def init_state():
         "prefs": {},
         "results": None,
         "rng_seed": random.randint(0, 999999),
+        "surprise_result": None,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -1004,6 +1005,10 @@ def wizard_screen():
         if st.button("🗺️ Skip to Explore Map", key="explore_bypass"):
             st.session_state.screen = "explore"
             st.rerun()
+    with c3:
+        if st.button("🧰 Tools", key="to_tools_wizard"):
+            st.session_state.screen = "tools"
+            st.rerun()
 
     step = st.session_state.wizard_step
     prefs = st.session_state.prefs
@@ -1640,6 +1645,10 @@ def explore_screen():
         if st.button("← Back to Wizard", key="back_to_wizard_explore"):
             st.session_state.screen = "wizard"
             st.rerun()
+    with nc2:
+        if st.button("🧰 Tools", key="to_tools_explore"):
+            st.session_state.screen = "tools"
+            st.rerun()
 
     # Build map data by region
     fig = go.Figure()
@@ -1794,7 +1803,7 @@ def results_screen():
         unsafe_allow_html=True,
     )
 
-    nc1, nc2, nc3 = st.columns([1, 1, 1])
+    nc1, nc2, nc3, nc4 = st.columns([1, 1, 1, 1])
     with nc1:
         if st.button("← Edit Preferences", key="back_to_wizard"):
             st.session_state.screen = "wizard"
@@ -1820,6 +1829,10 @@ def results_screen():
     with nc3:
         if st.button("🗺️ Explore Map", key="to_explore_from_results"):
             st.session_state.screen = "explore"
+            st.rerun()
+    with nc4:
+        if st.button("🧰 Tools", key="to_tools_results"):
+            st.session_state.screen = "tools"
             st.rerun()
 
     st.markdown("")
@@ -2109,6 +2122,341 @@ def results_screen():
                    "International flights are not included.")
 
 
+# ── Tools Screen ──────────────────────────────────────────────────────────────
+def tools_screen():
+    st.markdown(
+        '<div class="nav-bar">'
+        '<span class="nav-title">🧰 Travel Tools</span></div>',
+        unsafe_allow_html=True,
+    )
+
+    nc1, nc2, nc3 = st.columns([1, 1, 1])
+    with nc1:
+        if st.button("← Back to Wizard", key="back_to_wizard_tools"):
+            st.session_state.screen = "wizard"
+            st.rerun()
+    with nc2:
+        if st.button("🗺️ Explore Map", key="to_explore_tools"):
+            st.session_state.screen = "explore"
+            st.rerun()
+
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "⚖️ Compare Cities",
+        "🏆 Top Cities",
+        "💰 Budget Calculator",
+        "🎲 Surprise Me",
+    ])
+
+    # ── Tab 1: Compare Cities ─────────────────────────────────────────────────
+    with tab1:
+        st.subheader("⚖️ Compare Cities Side-by-Side")
+        city_names = sorted(CITIES.keys())
+        selected = st.multiselect(
+            "Pick 2–3 cities to compare",
+            city_names,
+            max_selections=3,
+            key="compare_cities_select",
+        )
+
+        if len(selected) < 2:
+            st.info("Select at least 2 cities to compare.")
+        else:
+            cols = st.columns(len(selected))
+            month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+            for i, city_name in enumerate(selected):
+                d = CITIES[city_name]
+                with cols[i]:
+                    safety_stars = "★" * d.get("safety", 3) + "☆" * (5 - d.get("safety", 3))
+                    best_months = ", ".join(month_names[m - 1] for m in d.get("months", []))
+                    tags_html = "".join(
+                        f'<span class="city-tag">{INTEREST_OPTIONS.get(t, t)}</span>'
+                        for t in d.get("tags", [])
+                    )
+                    food_html = "".join(f'<span class="food-drink-item">{f}</span>' for f in d.get("local_food", []))
+                    drink_html = "".join(f'<span class="drink-item">{dr}</span>' for dr in d.get("local_drink", []))
+
+                    st.markdown(
+                        f'<div class="detail-panel">'
+                        f'<h3>📍 {city_name}</h3>'
+                        f'<p style="color:#666;margin-top:0;">{d["country"]} · {d["region"]}</p>'
+                        f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0;">'
+                        f'<div class="cost-stat"><div class="val">${d["cost"]}</div><div class="lbl">Cost / Day</div></div>'
+                        f'<div class="cost-stat"><div class="val">{safety_stars}</div><div class="lbl">Safety</div></div>'
+                        f'<div class="cost-stat"><div class="val">${d.get("airbnb_cost", 60)}/n</div><div class="lbl">Airbnb</div></div>'
+                        f'<div class="cost-stat"><div class="val">${d.get("uber_cost", 8)}</div><div class="lbl">Avg Uber</div></div>'
+                        f'</div>'
+                        f'<p><strong>Language:</strong> {d.get("language", "Local")}</p>'
+                        f'<p><strong>Best Months:</strong> {best_months}</p>'
+                        f'<div style="margin:8px 0;">{tags_html}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+
+                    # Top 5 activities
+                    st.markdown('<h4>Top Activities</h4>', unsafe_allow_html=True)
+                    for j, a in enumerate(d.get("top_activities", [])[:5], 1):
+                        st.markdown(
+                            f'<div class="activity-rank">'
+                            f'<span class="activity-number">{j}</span> {a}</div>',
+                            unsafe_allow_html=True,
+                        )
+
+                    # Food & drink
+                    st.markdown(
+                        f'<div style="margin:12px 0;">{food_html}{drink_html}</div>',
+                        unsafe_allow_html=True,
+                    )
+
+            # Winner summary
+            st.markdown("---")
+            st.markdown("### 🏅 Quick Comparison")
+            comparison = [(n, CITIES[n]) for n in selected]
+            cheapest = min(comparison, key=lambda x: x[1]["cost"])
+            safest = max(comparison, key=lambda x: x[1].get("safety", 3))
+            best_airbnb = min(comparison, key=lambda x: x[1].get("airbnb_cost", 60))
+            best_uber = min(comparison, key=lambda x: x[1].get("uber_cost", 8))
+
+            wc1, wc2, wc3, wc4 = st.columns(4)
+            with wc1:
+                st.markdown(
+                    f'<div class="metric-box"><div class="metric-val">{cheapest[0]}</div>'
+                    f'<div class="metric-lbl">💸 Cheapest (${cheapest[1]["cost"]}/day)</div></div>',
+                    unsafe_allow_html=True,
+                )
+            with wc2:
+                st.markdown(
+                    f'<div class="metric-box"><div class="metric-val">{safest[0]}</div>'
+                    f'<div class="metric-lbl">🛡️ Safest ({safest[1].get("safety", 3)}/5)</div></div>',
+                    unsafe_allow_html=True,
+                )
+            with wc3:
+                st.markdown(
+                    f'<div class="metric-box"><div class="metric-val">{best_airbnb[0]}</div>'
+                    f'<div class="metric-lbl">🏠 Best Airbnb (${best_airbnb[1].get("airbnb_cost", 60)}/n)</div></div>',
+                    unsafe_allow_html=True,
+                )
+            with wc4:
+                st.markdown(
+                    f'<div class="metric-box"><div class="metric-val">{best_uber[0]}</div>'
+                    f'<div class="metric-lbl">🚗 Cheapest Uber (${best_uber[1].get("uber_cost", 8)})</div></div>',
+                    unsafe_allow_html=True,
+                )
+
+    # ── Tab 2: Top Cities By Category ─────────────────────────────────────────
+    with tab2:
+        st.subheader("🏆 Top 10 Cities By Category")
+
+        categories = {
+            "💸 Cheapest": {
+                "sort": lambda n, d: d["cost"],
+                "reverse": False,
+                "stat": lambda d: f"${d['cost']}/day",
+            },
+            "💎 Most Expensive": {
+                "sort": lambda n, d: d["cost"],
+                "reverse": True,
+                "stat": lambda d: f"${d['cost']}/day",
+            },
+            "🛡️ Safest": {
+                "sort": lambda n, d: d.get("safety", 3),
+                "reverse": True,
+                "stat": lambda d: f"{d.get('safety', 3)}/5 safety",
+            },
+            "🍜 Best Food Scene": {
+                "sort": lambda n, d: len(d.get("local_food", [])) * 3 + len(d.get("local_drink", [])),
+                "reverse": True,
+                "stat": lambda d: f"{len(d.get('local_food', []))} dishes · ${d['cost']}/day",
+                "filter": lambda n, d: "food" in d.get("tags", []),
+            },
+            "🍸 Best Nightlife": {
+                "sort": lambda n, d: -d["cost"],
+                "reverse": False,
+                "stat": lambda d: f"${d['cost']}/day",
+                "filter": lambda n, d: "nightlife" in d.get("tags", []),
+            },
+            "🏖️ Best for Beaches": {
+                "sort": lambda n, d: -d["cost"],
+                "reverse": False,
+                "stat": lambda d: f"${d['cost']}/day · {d.get('beach_type', 'beach')}",
+                "filter": lambda n, d: "beaches" in d.get("tags", []),
+            },
+            "🥾 Best for Hiking": {
+                "sort": lambda n, d: -d["cost"],
+                "reverse": False,
+                "stat": lambda d: f"${d['cost']}/day · {d.get('terrain', 'varied')}",
+                "filter": lambda n, d: "hiking" in d.get("tags", []),
+            },
+            "🏛️ Best for Culture": {
+                "sort": lambda n, d: sum(1 for t in d.get("tags", []) if t in ("culture", "temples", "art", "architecture")) * 10 - d["cost"] * 0.05,
+                "reverse": True,
+                "stat": lambda d: f"${d['cost']}/day",
+                "filter": lambda n, d: any(t in d.get("tags", []) for t in ("culture", "temples", "art", "architecture")),
+            },
+            "🎒 Best for Solo Travel": {
+                "sort": lambda n, d: d.get("safety", 3) * 10 + d.get("wifi", 3) * 5 - d["cost"] * 0.1,
+                "reverse": True,
+                "stat": lambda d: f"${d['cost']}/day · Safety {d.get('safety', 3)}/5",
+            },
+            "💕 Best for Honeymoon": {
+                "sort": lambda n, d: d.get("safety", 3) + d.get("comfort", 3),
+                "reverse": True,
+                "stat": lambda d: f"${d['cost']}/day · Comfort {d.get('comfort', 3)}/5",
+                "filter": lambda n, d: "honeymoon" in d.get("best_for", []),
+            },
+        }
+
+        category = st.selectbox("Pick a category", list(categories.keys()), key="top_category_select")
+        config = categories[category]
+
+        candidates = list(CITIES.items())
+        if "filter" in config:
+            candidates = [(n, d) for n, d in candidates if config["filter"](n, d)]
+
+        ranked = sorted(candidates, key=lambda x: config["sort"](x[0], x[1]), reverse=config["reverse"])[:10]
+
+        for rank, (city_name, city_data) in enumerate(ranked, 1):
+            stat_text = config["stat"](city_data)
+            region_color = REGION_COLORS.get(city_data["region"], "#888")
+            st.markdown(
+                f'<div class="activity-rank" style="padding:12px 8px;margin-bottom:4px;">'
+                f'<span class="activity-number" style="width:32px;height:32px;font-size:1rem;">{rank}</span>'
+                f'<span style="flex:1;">'
+                f'<strong>{city_name}</strong>, {city_data["country"]}'
+                f'<span style="color:{region_color};margin-left:8px;font-size:0.8rem;">● {city_data["region"]}</span>'
+                f'</span>'
+                f'<span style="color:#4361ee;font-weight:600;">{stat_text}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+    # ── Tab 3: Budget Calculator ──────────────────────────────────────────────
+    with tab3:
+        st.subheader("💰 Trip Budget Calculator")
+
+        bc1, bc2, bc3 = st.columns(3)
+        with bc1:
+            calc_city = st.selectbox("City", sorted(CITIES.keys()), key="budget_calc_city")
+        with bc2:
+            calc_days = st.number_input("Trip Length (days)", 3, 30, 7, key="budget_calc_days")
+        with bc3:
+            calc_group = st.radio(
+                "Group Size",
+                ["Solo", "Couple", "Group (4)", "Family (4)"],
+                key="budget_calc_group",
+                horizontal=True,
+            )
+
+        group_map = {"Solo": 1, "Couple": 2, "Group (4)": 4, "Family (4)": 4}
+        group_size = group_map[calc_group]
+
+        cd = CITIES[calc_city]
+        cost_pp = cd["cost"]
+        airbnb = cd.get("airbnb_cost", 60)
+        uber = cd.get("uber_cost", 8)
+
+        airbnb_units = 1 if group_size <= 2 else 2
+        airbnb_total = airbnb * calc_days * airbnb_units
+        food_total = cost_pp * calc_days * group_size
+        uber_total = uber * calc_days * 2
+        if group_size > 2:
+            uber_total = uber_total * 2
+        grand_total = airbnb_total + food_total + uber_total
+        per_person = grand_total / group_size
+
+        st.markdown("")
+        st.markdown(
+            f'<div class="budget-card">'
+            f'<div class="budget-label">{calc_city} · {calc_days} days · {group_size} {"person" if group_size == 1 else "people"}</div>'
+            f'<div class="budget-amount">${grand_total:,.0f}</div>'
+            f'<div class="budget-label">Estimated Total</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown("")
+
+        b1, b2, b3, b4 = st.columns(4)
+        with b1:
+            st.markdown(
+                f'<div class="cost-stat"><div class="val">${airbnb_total:,.0f}</div>'
+                f'<div class="lbl">🏠 Accommodation<br>{airbnb_units} Airbnb × {calc_days}n</div></div>',
+                unsafe_allow_html=True,
+            )
+        with b2:
+            st.markdown(
+                f'<div class="cost-stat"><div class="val">${food_total:,.0f}</div>'
+                f'<div class="lbl">🍽️ Food & Activities<br>${cost_pp}/day × {group_size}pp</div></div>',
+                unsafe_allow_html=True,
+            )
+        with b3:
+            st.markdown(
+                f'<div class="cost-stat"><div class="val">${uber_total:,.0f}</div>'
+                f'<div class="lbl">🚗 Transport<br>~2 rides/day</div></div>',
+                unsafe_allow_html=True,
+            )
+        with b4:
+            st.markdown(
+                f'<div class="cost-stat"><div class="val">${per_person:,.0f}</div>'
+                f'<div class="lbl">👤 Per Person<br>total ÷ {group_size}</div></div>',
+                unsafe_allow_html=True,
+            )
+
+    # ── Tab 4: Surprise Me ────────────────────────────────────────────────────
+    with tab4:
+        st.subheader("🎲 Surprise Me!")
+        st.markdown("Not sure where to go? Let us pick a random destination for you!")
+
+        s1, s2 = st.columns(2)
+        with s1:
+            region_options = ["Any Region"] + list(REGION_COLORS.keys())
+            surprise_region = st.selectbox("Region", region_options, key="surprise_region")
+        with s2:
+            budget_tier = st.radio(
+                "Budget Range",
+                ["Budget (< $50/day)", "Mid-Range ($50–$120/day)", "Luxury ($120+/day)"],
+                key="surprise_budget",
+                horizontal=True,
+            )
+
+        label_to_key = {v: k for k, v in INTEREST_OPTIONS.items()}
+        surprise_interests = st.multiselect(
+            "Interests (optional — leave empty for any)",
+            list(INTEREST_OPTIONS.values()),
+            key="surprise_interests",
+        )
+        interest_keys = [label_to_key[l] for l in surprise_interests if l in label_to_key]
+
+        if st.button("🎲 Surprise Me!", type="primary", key="surprise_btn"):
+            candidates = []
+            for name, data in CITIES.items():
+                if surprise_region != "Any Region" and data["region"] != surprise_region:
+                    continue
+                cost = data["cost"]
+                if budget_tier.startswith("Budget") and cost >= 50:
+                    continue
+                if budget_tier.startswith("Mid") and (cost < 50 or cost > 120):
+                    continue
+                if budget_tier.startswith("Luxury") and cost < 120:
+                    continue
+                if interest_keys and not any(t in data.get("tags", []) for t in interest_keys):
+                    continue
+                candidates.append((name, data))
+
+            if candidates:
+                st.session_state.surprise_result = random.choice(candidates)
+            else:
+                st.session_state.surprise_result = None
+                st.warning("No cities match those filters. Try broadening your criteria!")
+
+        result = st.session_state.get("surprise_result")
+        if result:
+            city_name, city_data = result
+            st.markdown("")
+            st.success(f"Your surprise destination: **{city_name}, {city_data['country']}**!")
+            render_city_detail(city_name, city_data, context="explore")
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
     inject_css()
@@ -2120,6 +2468,8 @@ def main():
         results_screen()
     elif st.session_state.screen == "explore":
         explore_screen()
+    elif st.session_state.screen == "tools":
+        tools_screen()
     else:
         wizard_screen()
 
