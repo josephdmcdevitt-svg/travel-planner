@@ -257,9 +257,7 @@ def save_trip_for_user(username, trip_data):
 # ── Session State ──────────────────────────────────────────────────────────────
 def init_state():
     defaults = {
-        "logged_in": False,
-        "username": "",
-        "screen": "login",
+        "screen": "wizard",
         "wizard_step": 1,
         "prefs": {},
         "results": None,
@@ -902,22 +900,14 @@ def show_step_indicator(current):
 def wizard_screen():
     # Nav bar
     st.markdown(
-        f'<div class="nav-bar">'
-        f'<span class="nav-title">🌍 Travel Planner</span>'
-        f'<span class="nav-user">👤 {st.session_state.username}</span></div>',
+        '<div class="nav-bar">'
+        '<span class="nav-title">🌍 Travel Planner</span></div>',
         unsafe_allow_html=True,
     )
     c1, c2, c3 = st.columns([1, 2, 1])
     with c1:
         if st.button("🗺️ Skip to Explore Map", key="explore_bypass"):
             st.session_state.screen = "explore"
-            st.rerun()
-    with c3:
-        if st.button("Log Out", key="logout_wizard"):
-            st.session_state.logged_in = False
-            st.session_state.screen = "login"
-            st.session_state.wizard_step = 1
-            st.session_state.prefs = {}
             st.rerun()
 
     step = st.session_state.wizard_step
@@ -1515,9 +1505,8 @@ def _render_match_breakdown(city_name, city_data, prefs):
 # ── Explore Map Screen ─────────────────────────────────────────────────────────
 def explore_screen():
     st.markdown(
-        f'<div class="nav-bar">'
-        f'<span class="nav-title">🌍 Explore the World</span>'
-        f'<span class="nav-user">👤 {st.session_state.username}</span></div>',
+        '<div class="nav-bar">'
+        '<span class="nav-title">🌍 Explore the World</span></div>',
         unsafe_allow_html=True,
     )
 
@@ -1525,13 +1514,6 @@ def explore_screen():
     with nc1:
         if st.button("← Back to Wizard", key="back_to_wizard_explore"):
             st.session_state.screen = "wizard"
-            st.rerun()
-    with nc3:
-        if st.button("🚪 Log Out", key="logout_explore"):
-            st.session_state.logged_in = False
-            st.session_state.screen = "login"
-            st.session_state.wizard_step = 1
-            st.session_state.prefs = {}
             st.rerun()
 
     # Build map data by region
@@ -1615,13 +1597,12 @@ def results_screen():
     recommended = results["recommended"]
 
     st.markdown(
-        f'<div class="nav-bar">'
-        f'<span class="nav-title">🌍 Travel Planner — Your Trip</span>'
-        f'<span class="nav-user">👤 {st.session_state.username}</span></div>',
+        '<div class="nav-bar">'
+        '<span class="nav-title">🌍 Travel Planner — Your Trip</span></div>',
         unsafe_allow_html=True,
     )
 
-    nc1, nc2, nc3, nc4 = st.columns([1, 1, 1, 1])
+    nc1, nc2, nc3 = st.columns([1, 1, 1])
     with nc1:
         if st.button("← Edit Preferences", key="back_to_wizard"):
             st.session_state.screen = "wizard"
@@ -1645,24 +1626,8 @@ def results_screen():
                 st.session_state.results = new_result
             st.rerun()
     with nc3:
-        if st.button("💾 Save Trip", key="save_trip"):
-            save_trip_for_user(st.session_state.username, {
-                "prefs": prefs,
-                "results": {
-                    "countries": [r["country"] for r in recommended],
-                    "cities": [c["name"] for ci in recommended for c in ci["cities"]],
-                    "total_cost": results["total_cost"],
-                    "trip_days": results["trip_days"],
-                },
-            })
-            st.success("Trip saved!")
-    with nc4:
-        if st.button("🚪 Log Out", key="logout_results"):
-            st.session_state.logged_in = False
-            st.session_state.screen = "login"
-            st.session_state.wizard_step = 1
-            st.session_state.prefs = {}
-            st.session_state.results = None
+        if st.button("🗺️ Explore Map", key="to_explore_from_results"):
+            st.session_state.screen = "explore"
             st.rerun()
 
     st.markdown("")
@@ -1957,16 +1922,14 @@ def main():
     inject_css()
     init_state()
 
-    if not st.session_state.logged_in:
-        login_screen()
-    elif st.session_state.screen == "wizard":
+    if st.session_state.screen == "wizard":
         wizard_screen()
     elif st.session_state.screen == "results":
         results_screen()
     elif st.session_state.screen == "explore":
         explore_screen()
     else:
-        login_screen()
+        wizard_screen()
 
 
 main()
