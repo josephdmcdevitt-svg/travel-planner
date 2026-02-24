@@ -792,6 +792,43 @@ def inject_css():
         background: white; border-radius: 16px; padding: 20px;
         box-shadow: 0 4px 15px rgba(0,0,0,0.06); margin-top: 16px;
     }
+    .detail-panel {
+        background: white; border-radius: 16px; padding: 28px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.07); margin-top: 16px;
+    }
+    .detail-panel h3 { color: #1a1a2e; font-size: 1.5rem; margin-bottom: 4px; }
+    .detail-panel h4 { color: #4361ee; font-size: 1.05rem; margin: 18px 0 8px; font-weight: 600; }
+    .neighborhood-item {
+        background: #f0f4ff; border-radius: 10px; padding: 10px 14px;
+        margin-bottom: 6px; font-size: 0.92rem; color: #333;
+        border-left: 3px solid #4361ee;
+    }
+    .activity-rank {
+        display: flex; align-items: center; padding: 6px 0;
+        border-bottom: 1px solid #f0f0f0; font-size: 0.92rem;
+    }
+    .activity-number {
+        background: #4361ee; color: white; border-radius: 50%;
+        width: 24px; height: 24px; display: inline-flex;
+        align-items: center; justify-content: center;
+        font-size: 0.75rem; font-weight: 700; margin-right: 10px; flex-shrink: 0;
+    }
+    .food-drink-item {
+        display: inline-block; background: #fff3e0; color: #e65100;
+        padding: 4px 12px; border-radius: 20px; font-size: 0.82rem;
+        margin: 3px 4px; font-weight: 500;
+    }
+    .drink-item {
+        display: inline-block; background: #e8f5e9; color: #2e7d32;
+        padding: 4px 12px; border-radius: 20px; font-size: 0.82rem;
+        margin: 3px 4px; font-weight: 500;
+    }
+    .cost-stat {
+        background: #f8f9fa; border-radius: 12px; padding: 14px;
+        text-align: center;
+    }
+    .cost-stat .val { font-size: 1.4rem; font-weight: 700; color: #4361ee; }
+    .cost-stat .lbl { font-size: 0.78rem; color: #888; }
     </style>""", unsafe_allow_html=True)
 
 
@@ -1317,6 +1354,164 @@ def wizard_screen():
                     st.rerun()
 
 
+# ── City Detail View ──────────────────────────────────────────────────────────
+def render_city_detail(city_name, city_data, context="explore", prefs=None, trip_days=None):
+    """Render a rich detail panel for a city. Used by both explore and results screens."""
+    country = city_data.get("country", "")
+    desc = city_data.get("description", "A great destination")
+    safety = city_data.get("safety", 3)
+    language = city_data.get("language", "Local")
+    uber = city_data.get("uber_cost", 8)
+    airbnb = city_data.get("airbnb_cost", 60)
+    neighborhoods = city_data.get("neighborhoods", [])
+    activities = city_data.get("top_activities", [])
+    local_food = city_data.get("local_food", [])
+    local_drink = city_data.get("local_drink", [])
+    things = city_data.get("things_to_do", [])
+    best_months_nums = city_data.get("months", [])
+    festivals = city_data.get("festivals", [])
+    cost_pp = city_data.get("cost", 100)
+
+    month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    best_months = ", ".join(month_names[m - 1] for m in best_months_nums)
+    safety_stars = "★" * safety + "☆" * (5 - safety)
+
+    st.markdown(f'<div class="detail-panel">', unsafe_allow_html=True)
+
+    # Header
+    st.markdown(f'<h3>📍 {city_name}, {country}</h3>', unsafe_allow_html=True)
+    st.markdown(f'<p style="color:#555;margin-top:0;">{desc}</p>', unsafe_allow_html=True)
+
+    # Quick stats row
+    st.markdown(
+        f'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin:12px 0;">'
+        f'<div class="cost-stat"><div class="val">{safety_stars}</div><div class="lbl">Safety</div></div>'
+        f'<div class="cost-stat"><div class="val">{language}</div><div class="lbl">Language</div></div>'
+        f'<div class="cost-stat"><div class="val">${uber}</div><div class="lbl">Avg Uber Ride</div></div>'
+        f'<div class="cost-stat"><div class="val">${airbnb}/n</div><div class="lbl">Avg Airbnb</div></div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Neighborhoods
+    if neighborhoods:
+        st.markdown('<h4>🏘️ Top Neighborhoods</h4>', unsafe_allow_html=True)
+        for i, n in enumerate(neighborhoods, 1):
+            st.markdown(f'<div class="neighborhood-item"><strong>{i}.</strong> {n}</div>', unsafe_allow_html=True)
+
+    # Top 10 Activities
+    if activities:
+        st.markdown('<h4>🏆 Top 10 Activities</h4>', unsafe_allow_html=True)
+        acts_html = ""
+        for i, a in enumerate(activities[:10], 1):
+            acts_html += f'<div class="activity-rank"><span class="activity-number">{i}</span> {a}</div>'
+        st.markdown(acts_html, unsafe_allow_html=True)
+
+    # Food & Drink + Things to Do (two columns)
+    col1, col2 = st.columns(2)
+    with col1:
+        if local_food:
+            st.markdown('<h4>🍜 Local Food</h4>', unsafe_allow_html=True)
+            food_html = "".join(f'<span class="food-drink-item">{f}</span>' for f in local_food)
+            st.markdown(food_html, unsafe_allow_html=True)
+        if local_drink:
+            st.markdown('<h4>🍹 Local Drinks</h4>', unsafe_allow_html=True)
+            drink_html = "".join(f'<span class="drink-item">{d}</span>' for d in local_drink)
+            st.markdown(drink_html, unsafe_allow_html=True)
+
+    with col2:
+        if things:
+            st.markdown('<h4>📋 Things To Do</h4>', unsafe_allow_html=True)
+            for t in things:
+                st.markdown(f'- {t}')
+
+    # Cost summary
+    st.markdown('<h4>💰 Cost Summary</h4>', unsafe_allow_html=True)
+    daily_total = cost_pp + uber + (airbnb if airbnb else 0)
+    st.markdown(
+        f'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">'
+        f'<div class="cost-stat"><div class="val">${cost_pp}</div><div class="lbl">Daily Budget / Person</div></div>'
+        f'<div class="cost-stat"><div class="val">${uber}</div><div class="lbl">Avg Uber Ride</div></div>'
+        f'<div class="cost-stat"><div class="val">${airbnb}</div><div class="lbl">Airbnb / Night</div></div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Best months + festivals
+    st.markdown('<h4>📅 Best Months & Festivals</h4>', unsafe_allow_html=True)
+    st.markdown(f'**Best months to visit:** {best_months}')
+    if festivals:
+        st.markdown(f'**Festivals:** {" · ".join(festivals)}')
+    else:
+        st.markdown('*No major festivals listed*')
+
+    # Results-only section: why recommended + budget estimate
+    if context == "results" and prefs:
+        st.markdown('<h4>🎯 Why We Recommended This City</h4>', unsafe_allow_html=True)
+        _render_match_breakdown(city_name, city_data, prefs)
+
+        if trip_days:
+            group_size = {"Solo": 1, "Couple": 2, "Group": 4, "Family": 4}.get(prefs.get("group", "Solo"), 2)
+            est_total = (cost_pp + airbnb) * trip_days + uber * trip_days * 0.5
+            est_group = est_total * group_size
+            st.markdown(
+                f'<div style="background:#f0f4ff;border-radius:12px;padding:16px;margin-top:12px;">'
+                f'<strong>Trip Budget Estimate ({trip_days} days, {group_size} people):</strong> '
+                f'~<strong style="color:#4361ee;font-size:1.2rem;">${est_group:,.0f}</strong> total '
+                f'(${est_total:,.0f} per person)'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+def _render_match_breakdown(city_name, city_data, prefs):
+    """Show human-readable reasons why this city was recommended."""
+    reasons = []
+    city_tags = city_data.get("tags", [])
+    user_tags = prefs.get("interests", [])
+
+    # Interest matches
+    matches = set(user_tags) & set(city_tags)
+    if matches:
+        labels = [INTEREST_OPTIONS.get(t, t).split(" ", 1)[-1] for t in matches]
+        reasons.append(f"Matches your interests: {', '.join(labels)}")
+
+    # Budget fit
+    trip_days = prefs.get("days", 10)
+    group_size = {"Solo": 1, "Couple": 2, "Group": 4, "Family": 4}.get(prefs.get("group", "Solo"), 2)
+    daily_budget = (prefs.get("budget", 3000) * 0.70) / max(trip_days, 1) / max(group_size, 1)
+    city_cost = city_data.get("cost", 100)
+    if city_cost <= daily_budget:
+        reasons.append(f"Fits your budget (${city_cost}/day vs ${daily_budget:.0f}/day available)")
+    elif city_cost <= daily_budget * 1.2:
+        reasons.append(f"Close to budget (${city_cost}/day, slightly above ${daily_budget:.0f}/day)")
+
+    # Weather match
+    travel_month = prefs.get("travel_month")
+    if travel_month and travel_month in city_data.get("months", []):
+        month_name = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][travel_month - 1]
+        reasons.append(f"Great weather in {month_name}")
+
+    # Safety
+    if prefs.get("safety_priority", 50) >= 70 and city_data.get("safety", 3) >= 4:
+        reasons.append(f"High safety rating ({city_data['safety']}/5)")
+
+    # Must-have experiences
+    for exp in prefs.get("must_have_experiences", []):
+        if city_name in EXPERIENCE_CITIES.get(exp, []):
+            reasons.append(f"Top destination for {exp.replace('_', ' ')}")
+
+    if not reasons:
+        reasons.append("Strong overall match for your travel preferences")
+
+    for r in reasons:
+        st.markdown(f'✅ {r}')
+
+
 # ── Explore Map Screen ─────────────────────────────────────────────────────────
 def explore_screen():
     st.markdown(
@@ -1404,47 +1599,7 @@ def explore_screen():
 
     if selected_city:
         data = CITIES[selected_city]
-        desc = data.get("description", "A great destination")
-        tags_html = "".join(
-            f'<span class="city-tag">{INTEREST_OPTIONS.get(t, t).split(" ", 1)[-1]}</span>'
-            for t in data.get("tags", [])[:8]
-        )
-        highlights = " · ".join(data.get("highlights", [])[:5])
-        best_months = ", ".join(
-            ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-             "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m - 1]
-            for m in data.get("months", [])
-        )
-        festivals = data.get("festivals", [])
-        fest_str = " · ".join(festivals) if festivals else "No major festivals listed"
-        best_for_labels = {
-            "honeymoon": "Honeymoon", "bucket_list": "Bucket list",
-            "digital_nomad": "Digital nomad", "family": "Family",
-            "bachelor_ette": "Bachelor/ette", "gap_year": "Gap year",
-            "retirement": "Retirement", "just_for_fun": "Just for fun",
-        }
-        best_for = ", ".join(best_for_labels.get(b, b) for b in data.get("best_for", []))
-
-        st.markdown(
-            f'<div class="explore-card">'
-            f'<div style="font-size:1.3rem;font-weight:700;color:#1a1a2e;">'
-            f'{selected_city}, {data["country"]}</div>'
-            f'<p style="color:#555;margin:8px 0;">{desc}</p>'
-            f'<div style="margin:8px 0;">{tags_html}</div>'
-            f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0;">'
-            f'<div><strong>Cost:</strong> ${data["cost"]}/day per person</div>'
-            f'<div><strong>Safety:</strong> {"⭐" * data.get("safety", 3)}</div>'
-            f'<div><strong>Wifi:</strong> {"📶" * data.get("wifi", 3)}</div>'
-            f'<div><strong>Language:</strong> {data.get("language", "Local")}</div>'
-            f'<div><strong>Best months:</strong> {best_months}</div>'
-            f'<div><strong>Terrain:</strong> {data.get("terrain", "flat").replace("_", " ").title()}</div>'
-            f'</div>'
-            f'<p><strong>Highlights:</strong> {highlights}</p>'
-            f'<p><strong>Festivals:</strong> {fest_str}</p>'
-            f'<p><strong>Best for:</strong> {best_for}</p>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
+        render_city_detail(selected_city, data, context="explore")
 
         if st.button(f"🗺️ Plan a trip to {selected_city}!", key="plan_trip_explore", type="primary"):
             st.session_state.prefs["region_pref"] = [data["region"]]
@@ -1568,6 +1723,12 @@ def results_screen():
                     )
 
             st.markdown('</div>', unsafe_allow_html=True)
+
+            # Expandable detail view for each city in this country
+            for city in country_info["cities"]:
+                city_days = next((c["days_allocated"] for c in results["cities"] if c["name"] == city["name"]), None)
+                with st.expander(f"📖 See full details for {city['name']}"):
+                    render_city_detail(city["name"], city["data"], context="results", prefs=prefs, trip_days=city_days)
 
     # ── Itinerary Tab ──
     with tab_itinerary:
