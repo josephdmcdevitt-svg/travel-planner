@@ -990,155 +990,389 @@ def generate_country_reason(country_info, prefs):
 def inject_css():
     st.markdown("""<style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-    .stApp { font-family: 'Inter', sans-serif; }
+
+    /* ── Design Tokens ── */
+    :root {
+        --color-primary: #4361ee;
+        --color-primary-dark: #3a56d4;
+        --color-primary-light: #e8eeff;
+        --color-accent: #2ec4b6;
+        --color-accent-dark: #20a89d;
+        --color-text: #1a1a2e;
+        --color-text-secondary: #555;
+        --color-text-muted: #888;
+        --color-text-light: #999;
+        --color-bg: #f4f6fb;
+        --color-bg-card: #ffffff;
+        --color-bg-subtle: #f8f9fa;
+        --color-border: #e9ecef;
+        --color-border-light: #f0f0f0;
+        --color-success: #28a745;
+        --color-danger: #dc3545;
+        --color-warning: #f0ad4e;
+        --radius-sm: 8px;
+        --radius-md: 12px;
+        --radius-lg: 16px;
+        --radius-xl: 20px;
+        --radius-full: 50%;
+        --shadow-sm: 0 2px 8px rgba(0,0,0,0.05);
+        --shadow-md: 0 4px 15px rgba(0,0,0,0.07);
+        --shadow-lg: 0 8px 30px rgba(0,0,0,0.10);
+        --shadow-hover: 0 8px 25px rgba(67,97,238,0.15);
+        --space-xs: 4px;
+        --space-sm: 8px;
+        --space-md: 16px;
+        --space-lg: 24px;
+        --space-xl: 32px;
+        --font-xs: 0.75rem;
+        --font-sm: 0.82rem;
+        --font-base: 0.9rem;
+        --font-md: 1rem;
+        --font-lg: 1.1rem;
+        --font-xl: 1.4rem;
+        --font-2xl: 1.8rem;
+        --font-3xl: 2.2rem;
+        --transition-fast: 0.2s ease;
+        --transition-base: 0.3s ease;
+    }
+
+    /* ── Global ── */
+    .stApp {
+        font-family: 'Inter', sans-serif;
+        background-color: var(--color-bg) !important;
+    }
+
+    /* ── Login ── */
     .login-box {
         max-width: 420px; margin: 60px auto; padding: 40px;
-        background: white; border-radius: 20px;
-        box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+        background: var(--color-bg-card); border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-lg);
     }
-    .login-title { text-align: center; font-size: 2rem; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
-    .login-sub { text-align: center; color: #666; margin-bottom: 24px; font-size: 0.95rem; }
+    .login-title { text-align: center; font-size: var(--font-2xl); font-weight: 700; color: var(--color-text); margin-bottom: var(--space-xs); }
+    .login-sub { text-align: center; color: #666; margin-bottom: var(--space-lg); font-size: var(--font-base); }
+
+    /* ── Wizard ── */
     .wizard-header { text-align: center; padding: 20px 0 10px; }
-    .wizard-title { font-size: 1.8rem; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
-    .wizard-sub { color: #666; font-size: 1rem; }
-    .step-indicator { display: flex; justify-content: center; gap: 8px; margin: 20px 0 30px; flex-wrap: wrap; }
+    .wizard-title { font-size: var(--font-2xl); font-weight: 700; color: var(--color-text); margin-bottom: var(--space-xs); }
+    .wizard-sub { color: #666; font-size: var(--font-md); }
+
+    /* ── Step Indicator ── */
+    .step-indicator { display: flex; justify-content: center; gap: var(--space-sm); margin: 20px 0 30px; flex-wrap: wrap; }
     .step-dot {
-        width: 36px; height: 36px; border-radius: 50%; display: flex;
+        width: 38px; height: 38px; border-radius: var(--radius-full); display: flex;
         align-items: center; justify-content: center; font-weight: 600;
-        font-size: 0.8rem; transition: all 0.3s;
+        font-size: var(--font-sm); transition: all var(--transition-base);
     }
-    .step-active { background: #4361ee; color: white; }
-    .step-done { background: #2ec4b6; color: white; }
-    .step-pending { background: #e9ecef; color: #999; }
-    .result-card {
-        background: white; border-radius: 16px; padding: 24px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.06); margin-bottom: 16px;
+    .step-active {
+        background: var(--color-primary); color: white;
+        box-shadow: 0 0 0 4px rgba(67,97,238,0.25);
     }
-    .country-header { font-size: 1.4rem; font-weight: 700; color: #1a1a2e; margin-bottom: 8px; }
-    .city-tag {
-        display: inline-block; background: #e8f4f8; color: #1a7f8f;
-        padding: 4px 12px; border-radius: 20px; font-size: 0.8rem;
-        margin: 2px 4px; font-weight: 500;
-    }
-    .day-card {
-        background: #f8f9fa; border-radius: 12px; padding: 16px;
-        margin-bottom: 10px; border-left: 4px solid #4361ee;
-    }
-    .day-title { font-weight: 700; font-size: 1.05rem; color: #1a1a2e; margin-bottom: 8px; }
-    .activity-item { padding: 4px 0; color: #444; font-size: 0.92rem; }
-    .activity-time { font-weight: 600; color: #4361ee; min-width: 80px; display: inline-block; }
-    .budget-card {
-        background: linear-gradient(135deg, #4361ee, #3a56d4);
-        border-radius: 16px; padding: 24px; color: white; text-align: center;
-    }
-    .budget-amount { font-size: 2.2rem; font-weight: 700; }
-    .budget-label { font-size: 0.9rem; opacity: 0.85; }
-    .metric-box {
-        background: white; border-radius: 12px; padding: 18px; text-align: center;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    }
-    .metric-val { font-size: 1.8rem; font-weight: 700; color: #4361ee; }
-    .metric-lbl { font-size: 0.85rem; color: #888; }
-    .interest-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+    .step-done { background: var(--color-accent); color: white; }
+    .step-pending { background: var(--color-border); color: var(--color-text-light); }
+
+    /* ── Navigation Bar ── */
     .nav-bar {
         display: flex; justify-content: space-between; align-items: center;
-        padding: 12px 24px; border-bottom: 1px solid #eee; margin-bottom: 20px;
+        padding: var(--space-md) var(--space-lg);
+        border-bottom: 2px solid var(--color-border);
+        margin-bottom: 20px; background: var(--color-bg-card);
+        border-radius: 0 0 var(--radius-md) var(--radius-md);
     }
-    .nav-title { font-size: 1.3rem; font-weight: 700; color: #1a1a2e; }
-    .nav-user { color: #666; font-size: 0.9rem; }
+    .nav-title { font-size: var(--font-xl); font-weight: 700; color: var(--color-text); }
+    .nav-user { color: #666; font-size: var(--font-base); }
     div[data-testid="stForm"] { border: none !important; padding: 0 !important; }
+
+    /* ── Result Card ── */
+    .result-card {
+        background: var(--color-bg-card); border-radius: var(--radius-lg); padding: var(--space-lg);
+        box-shadow: var(--shadow-md); margin-bottom: var(--space-md);
+        transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .result-card:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-hover);
+    }
+    .country-header { font-size: var(--font-xl); font-weight: 700; color: var(--color-text); margin-bottom: var(--space-sm); }
+    .city-tag {
+        display: inline-block; background: var(--color-primary-light); color: #1a7f8f;
+        padding: var(--space-xs) var(--space-md); border-radius: var(--radius-xl);
+        font-size: var(--font-sm); margin: 2px var(--space-xs); font-weight: 500;
+    }
+
+    /* ── Day Card ── */
+    .day-card {
+        background: var(--color-bg-card); border-radius: var(--radius-md); padding: var(--space-md) var(--space-lg);
+        margin-bottom: var(--space-md); border-left: 5px solid var(--color-primary);
+        box-shadow: var(--shadow-sm);
+        transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .day-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+    .day-title { font-weight: 700; font-size: var(--font-lg); color: var(--color-text); margin-bottom: var(--space-sm); }
+    .activity-item { padding: var(--space-xs) 0; color: #444; font-size: var(--font-base); }
+    .activity-time { font-weight: 600; color: var(--color-primary); min-width: 90px; display: inline-block; }
+
+    /* ── Budget Card ── */
+    .budget-card {
+        background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+        border-radius: var(--radius-lg); padding: var(--space-lg); color: white; text-align: center;
+        transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .budget-card:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-hover);
+    }
+    .budget-amount { font-size: var(--font-3xl); font-weight: 700; }
+    .budget-label { font-size: var(--font-base); opacity: 0.85; }
+
+    /* ── Metric Box ── */
+    .metric-box {
+        background: var(--color-bg-card); border-radius: var(--radius-md); padding: 20px; text-align: center;
+        box-shadow: var(--shadow-sm); border-top: 4px solid var(--color-primary);
+        transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .metric-box:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+    .metric-val { font-size: var(--font-2xl); font-weight: 700; color: var(--color-primary); }
+    .metric-lbl { font-size: var(--font-sm); color: var(--color-text-muted); margin-top: var(--space-xs); }
+
+    /* ── Interest Grid ── */
+    .interest-grid { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin: 10px 0; }
+
+    /* ── Explore / Detail ── */
     .explore-card {
-        background: white; border-radius: 16px; padding: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.06); margin-top: 16px;
+        background: var(--color-bg-card); border-radius: var(--radius-lg); padding: 20px;
+        box-shadow: var(--shadow-md); margin-top: var(--space-md);
+        transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .explore-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-hover);
     }
     .detail-panel {
-        background: white; border-radius: 16px; padding: 28px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.07); margin-top: 16px;
+        background: var(--color-bg-card); border-radius: var(--radius-lg); padding: 28px;
+        box-shadow: var(--shadow-lg); margin-top: var(--space-md);
     }
-    .detail-panel h3 { color: #1a1a2e; font-size: 1.5rem; margin-bottom: 4px; }
-    .detail-panel h4 { color: #4361ee; font-size: 1.05rem; margin: 18px 0 8px; font-weight: 600; }
+    .detail-panel h3 { color: var(--color-text); font-size: 1.5rem; margin-bottom: var(--space-xs); }
+    .detail-panel h4 { color: var(--color-primary); font-size: var(--font-lg); margin: 18px 0 var(--space-sm); font-weight: 600; }
     .neighborhood-item {
         background: #f0f4ff; border-radius: 10px; padding: 10px 14px;
-        margin-bottom: 6px; font-size: 0.92rem; color: #333;
-        border-left: 3px solid #4361ee;
+        margin-bottom: 6px; font-size: var(--font-base); color: #333;
+        border-left: 3px solid var(--color-primary);
     }
     .activity-rank {
         display: flex; align-items: center; padding: 6px 0;
-        border-bottom: 1px solid #f0f0f0; font-size: 0.92rem;
+        border-bottom: 1px solid var(--color-border-light); font-size: var(--font-base);
     }
     .activity-number {
-        background: #4361ee; color: white; border-radius: 50%;
+        background: var(--color-primary); color: white; border-radius: var(--radius-full);
         width: 24px; height: 24px; display: inline-flex;
         align-items: center; justify-content: center;
-        font-size: 0.75rem; font-weight: 700; margin-right: 10px; flex-shrink: 0;
+        font-size: var(--font-xs); font-weight: 700; margin-right: 10px; flex-shrink: 0;
     }
     .food-drink-item {
         display: inline-block; background: #fff3e0; color: #e65100;
-        padding: 4px 12px; border-radius: 20px; font-size: 0.82rem;
-        margin: 3px 4px; font-weight: 500;
+        padding: var(--space-xs) var(--space-md); border-radius: var(--radius-xl);
+        font-size: var(--font-sm); margin: 3px var(--space-xs); font-weight: 500;
     }
     .drink-item {
         display: inline-block; background: #e8f5e9; color: #2e7d32;
-        padding: 4px 12px; border-radius: 20px; font-size: 0.82rem;
-        margin: 3px 4px; font-weight: 500;
+        padding: var(--space-xs) var(--space-md); border-radius: var(--radius-xl);
+        font-size: var(--font-sm); margin: 3px var(--space-xs); font-weight: 500;
     }
     .cost-stat {
-        background: #f8f9fa; border-radius: 12px; padding: 14px;
+        background: var(--color-bg-subtle); border-radius: var(--radius-md); padding: 14px;
         text-align: center;
     }
-    .cost-stat .val { font-size: 1.4rem; font-weight: 700; color: #4361ee; }
-    .cost-stat .lbl { font-size: 0.78rem; color: #888; }
+    .cost-stat .val { font-size: var(--font-xl); font-weight: 700; color: var(--color-primary); }
+    .cost-stat .lbl { font-size: var(--font-xs); color: var(--color-text-muted); }
+
+    /* ── Visa Badges ── */
     .visa-badge {
-        display: inline-block; padding: 4px 14px; border-radius: 20px;
-        font-size: 0.82rem; font-weight: 600; margin: 2px 4px;
+        display: inline-block; padding: var(--space-xs) 14px; border-radius: var(--radius-xl);
+        font-size: var(--font-sm); font-weight: 600; margin: 2px var(--space-xs);
     }
     .visa-free { background: #d4edda; color: #155724; }
     .visa-arrival { background: #fff3cd; color: #856404; }
     .visa-evisa { background: #ffe0b2; color: #e65100; }
     .visa-embassy { background: #f8d7da; color: #721c24; }
+
+    /* ── Transport Card ── */
     .transport-card {
-        background: linear-gradient(135deg, #f0f4ff, #e8f4f8); border-radius: 12px;
-        padding: 14px 18px; margin: 8px 0; border-left: 4px solid #2ec4b6;
-        display: flex; align-items: center; gap: 12px;
+        background: linear-gradient(135deg, #f0f4ff, #e8f4f8); border-radius: var(--radius-md);
+        padding: var(--space-md) 20px; margin: var(--space-sm) 0;
+        border: 2px solid var(--color-accent); border-left: 5px solid var(--color-accent);
+        display: flex; align-items: center; gap: var(--space-md);
+        transition: transform var(--transition-fast), box-shadow var(--transition-fast);
     }
-    .transport-icon { font-size: 1.5rem; }
+    .transport-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+    .transport-icon { font-size: 1.8rem; }
     .transport-details { flex: 1; }
-    .transport-details .route { font-weight: 600; color: #1a1a2e; font-size: 0.95rem; }
-    .transport-details .info { color: #666; font-size: 0.85rem; }
+    .transport-details .route { font-weight: 700; color: var(--color-text); font-size: var(--font-md); }
+    .transport-details .info { color: #666; font-size: var(--font-base); }
+
+    /* ── Practical Card + Grid ── */
     .practical-card {
-        background: white; border-radius: 12px; padding: 16px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 12px;
+        background: var(--color-bg-card); border-radius: var(--radius-md); padding: 20px;
+        box-shadow: var(--shadow-sm); margin-bottom: var(--space-md);
+        transition: transform var(--transition-fast), box-shadow var(--transition-fast);
     }
-    .practical-card h4 { color: #1a1a2e; margin: 0 0 10px; font-size: 1.1rem; }
+    .practical-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+    .practical-card h4 { color: var(--color-text); margin: 0 0 var(--space-md); font-size: var(--font-lg); }
     .practical-item {
         display: flex; justify-content: space-between; padding: 6px 0;
-        border-bottom: 1px solid #f0f0f0; font-size: 0.9rem;
+        border-bottom: 1px solid var(--color-border-light); font-size: var(--font-base);
     }
-    .practical-item .label { color: #888; font-weight: 500; }
+    .practical-item .label { color: var(--color-text-muted); font-weight: 500; }
     .practical-item .value { color: #333; font-weight: 600; }
+    .practical-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md);
+    }
+    .practical-grid-item {
+        background: var(--color-bg-subtle); border-radius: var(--radius-md);
+        padding: var(--space-md); display: flex; align-items: flex-start; gap: var(--space-sm);
+        transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .practical-grid-item:hover {
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-sm);
+    }
+    .practical-grid-item .pg-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .practical-grid-item .pg-label { font-size: var(--font-sm); color: var(--color-text-muted); }
+    .practical-grid-item .pg-value { font-size: var(--font-base); font-weight: 600; color: var(--color-text); }
+
+    /* ── Packing Category ── */
     .packing-category {
-        background: #f8f9fa; border-radius: 12px; padding: 16px;
-        margin-bottom: 12px;
+        background: var(--color-bg-card); border-radius: var(--radius-md); padding: var(--space-md) 20px;
+        margin-bottom: var(--space-md); box-shadow: var(--shadow-sm);
+        transition: transform var(--transition-fast), box-shadow var(--transition-fast);
     }
-    .packing-category h4 { color: #4361ee; margin: 0 0 10px; font-size: 1rem; }
+    .packing-category:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+    .packing-category h4 { color: var(--color-primary); margin: 0 0 var(--space-sm); font-size: var(--font-md); }
+    .packing-header {
+        display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm);
+    }
+    .packing-icon { font-size: 1.5rem; }
+    .packing-count {
+        background: var(--color-primary-light); color: var(--color-primary);
+        padding: 2px 10px; border-radius: var(--radius-xl);
+        font-size: var(--font-sm); font-weight: 600;
+    }
+
+    /* ── Activity Details ── */
     .activity-details {
-        background: #f8f9fa; border-radius: 10px; padding: 10px 14px;
-        margin: 4px 0; border-left: 3px solid #4361ee;
+        background: var(--color-bg-subtle); border-radius: 10px; padding: 10px 14px;
+        margin: var(--space-xs) 0; border-left: 3px solid var(--color-primary);
     }
-    .activity-details .act-name { font-weight: 600; color: #1a1a2e; font-size: 0.92rem; }
-    .activity-details .act-meta { color: #666; font-size: 0.8rem; margin-top: 2px; }
+    .activity-details .act-name { font-weight: 600; color: var(--color-text); font-size: var(--font-base); }
+    .activity-details .act-meta { color: #666; font-size: var(--font-sm); margin-top: 2px; }
     .maps-link {
-        color: #4361ee; text-decoration: none; font-size: 0.8rem; font-weight: 500;
+        color: var(--color-primary); text-decoration: none; font-size: var(--font-sm); font-weight: 500;
     }
     .maps-link:hover { text-decoration: underline; }
+
+    /* ── Search Link Buttons ── */
     .search-link-btn {
-        display: inline-block; padding: 6px 16px; border-radius: 8px;
-        font-size: 0.85rem; font-weight: 600; text-decoration: none;
-        margin: 4px 6px 4px 0;
+        display: inline-block; padding: 8px 18px; border-radius: var(--radius-sm);
+        font-size: var(--font-sm); font-weight: 600; text-decoration: none;
+        margin: var(--space-xs) 6px var(--space-xs) 0;
+        transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .search-link-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-sm);
     }
     .flight-link { background: #e3f2fd; color: #1565c0; }
     .hotel-link { background: #fff3e0; color: #e65100; }
     .airbnb-link { background: #fce4ec; color: #c62828; }
+
+    /* ── City Banner (Day-by-Day) ── */
+    .city-banner {
+        background: linear-gradient(135deg, var(--color-primary), #6c63ff);
+        color: white; padding: var(--space-md) var(--space-lg);
+        border-radius: var(--radius-md); margin: var(--space-lg) 0 var(--space-md);
+        box-shadow: var(--shadow-md);
+    }
+    .city-banner .cb-name { font-size: var(--font-xl); font-weight: 700; }
+    .city-banner .cb-meta { font-size: var(--font-base); opacity: 0.85; }
+
+    /* ── Time Slot Pills ── */
+    .time-morning {
+        display: inline-block; background: #fff8e1; color: #f57f17;
+        padding: 2px 10px; border-radius: var(--radius-xl); font-size: var(--font-xs);
+        font-weight: 600; margin-right: var(--space-xs);
+    }
+    .time-midday {
+        display: inline-block; background: #fff3e0; color: #e65100;
+        padding: 2px 10px; border-radius: var(--radius-xl); font-size: var(--font-xs);
+        font-weight: 600; margin-right: var(--space-xs);
+    }
+    .time-afternoon {
+        display: inline-block; background: #e3f2fd; color: #1565c0;
+        padding: 2px 10px; border-radius: var(--radius-xl); font-size: var(--font-xs);
+        font-weight: 600; margin-right: var(--space-xs);
+    }
+    .time-evening {
+        display: inline-block; background: #ede7f6; color: #4527a0;
+        padding: 2px 10px; border-radius: var(--radius-xl); font-size: var(--font-xs);
+        font-weight: 600; margin-right: var(--space-xs);
+    }
+    .time-night {
+        display: inline-block; background: #e8eaf6; color: #283593;
+        padding: 2px 10px; border-radius: var(--radius-xl); font-size: var(--font-xs);
+        font-weight: 600; margin-right: var(--space-xs);
+    }
+
+    /* ── Budget Bars ── */
+    .budget-bar-row {
+        display: flex; align-items: center; margin-bottom: 10px;
+    }
+    .budget-bar-row .bb-city { width: 160px; font-weight: 600; color: var(--color-text); font-size: var(--font-base); }
+    .budget-bar-track {
+        flex: 1; background: var(--color-border); border-radius: var(--radius-sm);
+        height: 32px; margin: 0 var(--space-md); overflow: hidden;
+    }
+    .budget-bar-fill {
+        height: 100%; border-radius: var(--radius-sm);
+        background: linear-gradient(90deg, var(--color-primary), #6c63ff);
+        display: flex; align-items: center; padding-left: 10px;
+        color: white; font-size: var(--font-sm); font-weight: 600;
+        transition: width var(--transition-base);
+    }
+    .budget-bar-row .bb-detail { width: 130px; color: #666; font-size: var(--font-sm); text-align: right; }
+
+    /* ── City Overview Card ── */
+    .city-overview-card {
+        background: var(--color-bg-subtle); border-radius: var(--radius-md); padding: var(--space-md);
+        transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .city-overview-card:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-hover);
+        background: var(--color-bg-card);
+    }
+
+    /* ── Flight Search Box ── */
+    .flight-search-box {
+        background: linear-gradient(135deg, #f0f4ff, #e8f4f8);
+        border-radius: var(--radius-md); padding: var(--space-md) 20px;
+        margin-bottom: var(--space-md); border: 1px solid var(--color-border);
+    }
+    .flight-search-box strong { color: var(--color-text); }
+
     </style>""", unsafe_allow_html=True)
 
 
@@ -2573,7 +2807,7 @@ def results_screen():
         return_url = generate_flight_search_url(last_dest, dep_city, end_date.isoformat())
 
         st.markdown(
-            f'<div style="background:#f0f4ff;border-radius:12px;padding:16px;margin-bottom:16px;">'
+            f'<div class="flight-search-box">'
             f'<strong>✈️ Search Flights</strong><br>'
             f'<a href="{outbound_url}" target="_blank" class="search-link-btn flight-link">'
             f'Outbound: {dep_city} → {first_dest} ({start_date.strftime("%b %d")})</a>'
@@ -2627,13 +2861,13 @@ def results_screen():
                     )
 
                     st.markdown(
-                        f'<div style="background:#f8f9fa;border-radius:12px;padding:16px;">'
-                        f'<strong style="font-size:1.1rem;">{city["name"]}</strong><br>'
-                        f'<span style="color:#888;font-size:0.85rem;">{alloc} days · ~${city["data"]["cost"]}/day pp</span><br>'
-                        f'<div style="margin:8px 0;">{tags_html}</div>'
-                        f'<span style="color:#666;font-size:0.82rem;">{highlights}</span><br>'
-                        f'<span style="color:#999;font-size:0.78rem;font-style:italic;">{desc}</span><br>'
-                        f'<div style="margin-top:8px;">{hotel_html}</div>'
+                        f'<div class="city-overview-card">'
+                        f'<strong style="font-size:var(--font-lg);">{city["name"]}</strong><br>'
+                        f'<span style="color:var(--color-text-muted);font-size:var(--font-sm);">{alloc} days · ~${city["data"]["cost"]}/day pp</span><br>'
+                        f'<div style="margin:var(--space-sm) 0;">{tags_html}</div>'
+                        f'<span style="color:var(--color-text-secondary);font-size:var(--font-sm);">{highlights}</span><br>'
+                        f'<span style="color:var(--color-text-light);font-size:var(--font-xs);font-style:italic;">{desc}</span><br>'
+                        f'<div style="margin-top:var(--space-sm);">{hotel_html}</div>'
                         f'</div>',
                         unsafe_allow_html=True,
                     )
@@ -2670,13 +2904,36 @@ def results_screen():
 
             if day["city"] != current_city:
                 current_city = day["city"]
-                st.markdown(f"---")
-                st.markdown(f"#### 📍 {current_city}, {day['country']}")
+                # Count days in this city
+                city_days = sum(1 for d in results["itinerary"] if d["city"] == current_city)
+                st.markdown(
+                    f'<div class="city-banner">'
+                    f'<div class="cb-name">📍 {current_city}</div>'
+                    f'<div class="cb-meta">{day["country"]} · {city_days} day{"s" if city_days != 1 else ""}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
 
             acts_html = ""
             for a in day["activities"]:
+                # Determine time-slot pill class
+                time_str = a.get("time", "").lower()
+                if "morning" in time_str or "breakfast" in time_str or ("am" in time_str and ("7" in time_str or "8" in time_str or "9" in time_str or "10" in time_str)):
+                    time_pill_class = "time-morning"
+                elif "midday" in time_str or "lunch" in time_str or "noon" in time_str or "12" in time_str:
+                    time_pill_class = "time-midday"
+                elif "afternoon" in time_str or ("pm" in time_str and ("1" in time_str or "2" in time_str or "3" in time_str or "4" in time_str)):
+                    time_pill_class = "time-afternoon"
+                elif "evening" in time_str or "dinner" in time_str or "sunset" in time_str or ("pm" in time_str and ("5" in time_str or "6" in time_str or "7" in time_str or "8" in time_str)):
+                    time_pill_class = "time-evening"
+                elif "night" in time_str or ("pm" in time_str and ("9" in time_str or "10" in time_str or "11" in time_str)):
+                    time_pill_class = "time-night"
+                else:
+                    time_pill_class = "time-afternoon"
+
+                time_pill = f'<span class="{time_pill_class}">{a["time"]}</span>'
+
                 if a.get("structured"):
-                    # Rich activity card with address, hours, cost, maps link
                     meta_parts = []
                     if a.get("address"):
                         meta_parts.append(f"📍 {a['address']}")
@@ -2690,10 +2947,10 @@ def results_screen():
                         maps_html = f' · <a href="{a["maps_url"]}" target="_blank" class="maps-link">📍 Open in Maps</a>'
                     desc_html = ""
                     if a.get("description"):
-                        desc_html = f'<div style="color:#888;font-size:0.78rem;margin-top:2px;">{a["description"]}</div>'
+                        desc_html = f'<div style="color:var(--color-text-muted);font-size:var(--font-xs);margin-top:2px;">{a["description"]}</div>'
                     acts_html += (
                         f'<div class="activity-details">'
-                        f'<span class="activity-time">{a["time"]}</span>'
+                        f'{time_pill}'
                         f'<span class="act-name">{a["activity"]}</span>'
                         f'<div class="act-meta">{meta_str}{maps_html}</div>'
                         f'{desc_html}'
@@ -2702,7 +2959,7 @@ def results_screen():
                 else:
                     acts_html += (
                         f'<div class="activity-item">'
-                        f'<span class="activity-time">{a["time"]}</span> {a["activity"]}'
+                        f'{time_pill} {a["activity"]}'
                         f'</div>'
                     )
 
@@ -2891,16 +3148,16 @@ def results_screen():
 
         st.markdown("")
         st.markdown("#### Cost per City")
+        max_city_cost = max((item["total"] for item in results["budget_breakdown"]), default=1)
         for item in results["budget_breakdown"]:
-            pct = (item["total"] / max(total, 1)) * 100
+            pct = (item["total"] / max(max_city_cost, 1)) * 100
             st.markdown(
-                f'<div style="display:flex;align-items:center;margin-bottom:8px;">'
-                f'<div style="width:160px;font-weight:600;">{item["city"]}</div>'
-                f'<div style="flex:1;background:#e9ecef;border-radius:8px;height:28px;margin:0 12px;">'
-                f'<div style="background:#4361ee;width:{pct:.0f}%;height:100%;border-radius:8px;'
-                f'display:flex;align-items:center;padding-left:8px;color:white;font-size:0.8rem;font-weight:600;">'
+                f'<div class="budget-bar-row">'
+                f'<div class="bb-city">{item["city"]}</div>'
+                f'<div class="budget-bar-track">'
+                f'<div class="budget-bar-fill" style="width:{pct:.0f}%;">'
                 f'${item["total"]:,}</div></div>'
-                f'<div style="width:120px;color:#666;font-size:0.85rem;">'
+                f'<div class="bb-detail">'
                 f'{item["days"]}d × ${item["daily_pp"]}/pp</div></div>',
                 unsafe_allow_html=True,
             )
@@ -2950,21 +3207,26 @@ def results_screen():
                         unsafe_allow_html=True)
 
             items = [
-                ("Visa", f'{visa_label} · Max {sample.get("visa_max_stay", "?")} days · {sample.get("visa_notes", "")}'),
-                ("Currency", f'{sample.get("currency_name", "?")} ({sample.get("currency", "?")}) {sample.get("currency_symbol", "")}'),
-                ("Power Plugs", sample.get("plug_type", "?")),
-                ("Tipping", sample.get("tipping", "?")),
-                ("Emergency", sample.get("emergency_number", "?")),
-                ("SIM Card", sample.get("sim_info", "?")),
-                ("Tap Water", sample.get("tap_water", "?")),
-                ("Dress Code", sample.get("dress_code", "?")),
+                ("🛂", "Visa", f'{visa_label} · Max {sample.get("visa_max_stay", "?")} days · {sample.get("visa_notes", "")}'),
+                ("💱", "Currency", f'{sample.get("currency_name", "?")} ({sample.get("currency", "?")}) {sample.get("currency_symbol", "")}'),
+                ("🔌", "Power Plugs", sample.get("plug_type", "?")),
+                ("💵", "Tipping", sample.get("tipping", "?")),
+                ("🚨", "Emergency", sample.get("emergency_number", "?")),
+                ("📱", "SIM Card", sample.get("sim_info", "?")),
+                ("🚰", "Tap Water", sample.get("tap_water", "?")),
+                ("👔", "Dress Code", sample.get("dress_code", "?")),
             ]
-            for label, value in items:
-                st.markdown(
-                    f'<div class="practical-item"><span class="label">{label}</span>'
-                    f'<span class="value">{value}</span></div>',
-                    unsafe_allow_html=True,
+            grid_html = '<div class="practical-grid">'
+            for icon, label, value in items:
+                grid_html += (
+                    f'<div class="practical-grid-item">'
+                    f'<div class="pg-icon">{icon}</div>'
+                    f'<div><div class="pg-label">{label}</div>'
+                    f'<div class="pg-value">{value}</div></div>'
+                    f'</div>'
                 )
+            grid_html += '</div>'
+            st.markdown(grid_html, unsafe_allow_html=True)
 
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -2977,8 +3239,23 @@ def results_screen():
         user_interests = prefs.get("interests", [])
         packing = generate_packing_list(results["cities"], results["trip_days"], user_interests)
 
+        packing_icons = {
+            "Clothing": "👕", "Footwear": "👟", "Toiletries": "🧴", "Electronics": "📱",
+            "Documents": "📄", "Accessories": "🎒", "Health": "💊", "Outdoor": "🏔️",
+            "Beach": "🏖️", "Winter": "🧥", "Rain Gear": "☔", "Hiking": "🥾",
+            "Photography": "📸", "Snorkeling": "🤿", "Formal": "👔", "Misc": "📦",
+        }
         for category, items in packing.items():
-            st.markdown(f'<div class="packing-category"><h4>{category}</h4>', unsafe_allow_html=True)
+            cat_icon = packing_icons.get(category, "📦")
+            st.markdown(
+                f'<div class="packing-category">'
+                f'<div class="packing-header">'
+                f'<span class="packing-icon">{cat_icon}</span>'
+                f'<h4 style="margin:0;">{category}</h4>'
+                f'<span class="packing-count">{len(items)} items</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
             for item in items:
                 st.checkbox(item, key=f"pack_{category}_{item}")
             st.markdown('</div>', unsafe_allow_html=True)
