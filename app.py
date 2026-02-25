@@ -2456,7 +2456,7 @@ def generate_pdf_itinerary(results, prefs):
     pdf.cell(0, 5, f"Generated on {date.today().strftime('%B %d, %Y')} by Travel Planner", ln=True, align="C")
     pdf.cell(0, 5, "Prices are estimates. Always verify visa requirements with official sources before travel.", ln=True, align="C")
 
-    return pdf.output()
+    return bytes(pdf.output())
 
 
 # ── Results Screen ─────────────────────────────────────────────────────────────
@@ -2503,14 +2503,17 @@ def results_screen():
             st.session_state.screen = "tools"
             st.rerun()
     with nc5:
-        pdf_bytes = generate_pdf_itinerary(results, prefs)
-        st.download_button(
-            label="📄 Download PDF",
-            data=pdf_bytes,
-            file_name="travel_itinerary.pdf",
-            mime="application/pdf",
-            key="download_pdf",
-        )
+        try:
+            pdf_bytes = generate_pdf_itinerary(results, prefs)
+            st.download_button(
+                label="📄 Download PDF",
+                data=pdf_bytes,
+                file_name="travel_itinerary.pdf",
+                mime="application/pdf",
+                key="download_pdf",
+            )
+        except Exception:
+            st.button("📄 PDF unavailable", disabled=True, key="pdf_err")
 
     st.markdown("")
 
