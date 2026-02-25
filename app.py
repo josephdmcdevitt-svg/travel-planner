@@ -6,8 +6,11 @@ import os
 import random
 import secrets
 import math
+import io
 from datetime import date, timedelta
-from cities import CITIES
+from urllib.parse import quote
+from cities import CITIES, TRANSPORT_ROUTES
+from fpdf import FPDF
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Travel Planner", page_icon="🌍", layout="wide")
@@ -598,6 +601,121 @@ def recommend(prefs):
     return result
 
 
+# ── Travel Utility Functions ──────────────────────────────────────────────────
+def haversine(lat1, lon1, lat2, lon2):
+    """Distance in km between two lat/lon points."""
+    R = 6371
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    return R * 2 * math.asin(math.sqrt(a))
+
+
+def get_transport_between(city_a, city_b):
+    """Look up TRANSPORT_ROUTES for a city pair, fall back to distance-based estimate."""
+    route = TRANSPORT_ROUTES.get((city_a, city_b)) or TRANSPORT_ROUTES.get((city_b, city_a))
+    if route:
+        return route
+    # Fall back: estimate from distance
+    data_a = CITIES.get(city_a, {})
+    data_b = CITIES.get(city_b, {})
+    if not data_a or not data_b:
+        return {"mode": "flight", "name": "Flight", "duration": 3, "cost": 150, "notes": "Estimated"}
+    dist = haversine(data_a["lat"], data_a["lon"], data_b["lat"], data_b["lon"])
+    same_country = data_a.get("country") == data_b.get("country")
+    if dist < 300 and same_country:
+        return {"mode": "bus", "name": "Bus/Train", "duration": round(dist / 80, 1), "cost": round(dist * 0.08), "notes": "Estimated overland"}
+    elif dist < 800:
+        return {"mode": "train", "name": "Train/Bus", "duration": round(dist / 120, 1), "cost": round(dist * 0.1), "notes": "Estimated"}
+    else:
+        return {"mode": "flight", "name": "Flight", "duration": round(1.5 + dist / 800, 1), "cost": round(50 + dist * 0.06), "notes": "Estimated flight"}
+
+
+def generate_flight_search_url(departure, destination, date_str):
+    """Generate a Google Flights search URL."""
+    return f"https://www.google.com/travel/flights?q=flights+from+{quote(departure)}+to+{quote(destination)}+on+{date_str}"
+
+
+def generate_hotel_search_urls(city, country, checkin, checkout):
+    """Generate Booking.com and Airbnb search URLs for a city."""
+    booking_url = f"https://www.booking.com/searchresults.html?ss={quote(city + ', ' + country)}&checkin={checkin}&checkout={checkout}"
+    airbnb_url = f"https://www.airbnb.com/s/{quote(city + '--' + country)}/homes?checkin={checkin}&checkout={checkout}"
+    return {"booking": booking_url, "airbnb": airbnb_url}
+
+
+def generate_packing_list(cities_data, trip_days, interests):
+    """Generate a smart packing list based on destinations and activities."""
+    weathers = set()
+    terrains = set()
+    has_beach = False
+    has_hiking = False
+    has_nightlife = False
+    has_temples = False
+    for c in cities_data:
+        d = c.get("data", c)
+        weathers.add(d.get("weather", "mild"))
+        terrains.add(d.get("terrain", "urban"))
+        if d.get("beach_type", "none") != "none":
+            has_beach = True
+    for tag in interests:
+        if tag == "hiking":
+            has_hiking = True
+        if tag == "nightlife":
+            has_nightlife = True
+        if tag == "temples":
+            has_temples = True
+
+    packing = {
+        "Essentials": [
+            "Passport (+ copies)", "Travel insurance docs", "Phone + charger",
+            "Power adapter", "Wallet / travel cards", "Medications",
+            "Copies of reservations", "Pen (for customs forms)",
+        ],
+        "Clothing": [
+            f"Underwear ({min(trip_days, 7)} pairs)",
+            f"Socks ({min(trip_days, 7)} pairs)",
+            f"T-shirts/tops ({min(trip_days, 5)})",
+            "Pants/shorts (2-3)", "Light jacket or hoodie",
+            "Sleepwear",
+        ],
+        "Toiletries": [
+            "Toothbrush + toothpaste", "Deodorant", "Sunscreen",
+            "Shampoo (travel size)", "Any prescriptions",
+        ],
+        "Tech": [
+            "Phone + charger", "Portable battery pack",
+            "Headphones", "Camera (optional)",
+        ],
+    }
+
+    # Weather-based additions
+    if "tropical" in weathers or "hot" in weathers:
+        packing["Clothing"].extend(["Breathable shorts", "Sun hat", "Sandals"])
+        packing["Essentials"].append("Insect repellent")
+    if "cold" in weathers or "snowy" in weathers:
+        packing["Clothing"].extend(["Warm coat", "Gloves", "Scarf", "Thermal base layer"])
+    if "rainy" in weathers:
+        packing["Essentials"].append("Compact umbrella or rain jacket")
+    if any(w in weathers for w in ["mild", "warm", "temperate", "mediterranean"]):
+        packing["Clothing"].append("Light layers for evening")
+
+    # Activity-based
+    if has_beach:
+        packing.setdefault("Beach & Water", []).extend(["Swimsuit", "Quick-dry towel", "Reef-safe sunscreen", "Waterproof phone pouch"])
+    if has_hiking:
+        packing.setdefault("Hiking & Outdoors", []).extend(["Hiking shoes/boots", "Daypack", "Water bottle", "First aid kit", "Rain layer"])
+    if has_nightlife:
+        packing["Clothing"].append("One nice outfit for going out")
+    if has_temples:
+        packing["Clothing"].extend(["Modest clothing (covers shoulders/knees)", "Scarf or shawl"])
+
+    # Trip length adjustments
+    if trip_days > 14:
+        packing["Essentials"].append("Laundry bag + travel detergent")
+
+    return packing
+
+
 def build_itinerary(recommended, prefs):
     trip_days = prefs.get("days", 10)
     user_tags = prefs.get("interests", [])
@@ -633,28 +751,49 @@ def build_itinerary(recommended, prefs):
 
     activities_per_day = {"Relaxed": 3, "Moderate": 4, "Packed": 5}.get(pace, 4)
     itinerary = []
+    transport_legs = []  # transport info between cities
     day_counter = 1
 
     for i, city in enumerate(all_cities):
         city_data = city["data"]
         city_name = city["name"]
-        highlights = list(city_data.get("highlights", []))
+        structured = city_data.get("structured_activities", [])
         used = set()
 
-        pool = []
-        for h in highlights:
-            pool.append(h)
-
-        for tag in user_tags:
-            if tag in city_data.get("tags", []):
-                for act in ACTIVITY_TEMPLATES.get(tag, []):
-                    pool.append(act.format(city=city_name))
-
-        pool.extend([
-            f"Explore {city_name}'s neighborhoods on foot",
-            f"Relax at a local café in {city_name}",
-            f"Free time to wander and discover {city_name}",
-        ])
+        # Build activity pool — prefer structured activities with real details
+        if structured:
+            # Filter by user interest tags for relevance
+            time_map = {"morning": "Morning", "afternoon": "Afternoon", "evening": "Evening", "full_day": "Morning"}
+            tagged = [a for a in structured if any(t in a.get("tags", []) for t in user_tags)]
+            untagged = [a for a in structured if a not in tagged]
+            ordered = tagged + untagged  # relevant ones first
+            pool = []
+            for a in ordered:
+                pool.append({
+                    "activity": a["name"],
+                    "address": a.get("address", ""),
+                    "hours": a.get("hours", ""),
+                    "cost": a.get("cost", ""),
+                    "maps_url": a.get("maps_url", ""),
+                    "description": a.get("description", ""),
+                    "time_of_day": time_map.get(a.get("time_of_day", "morning"), "Morning"),
+                    "structured": True,
+                })
+        else:
+            # Fall back to template-based activities
+            pool = []
+            highlights = list(city_data.get("highlights", []))
+            for h in highlights:
+                pool.append({"activity": h, "structured": False})
+            for tag in user_tags:
+                if tag in city_data.get("tags", []):
+                    for act in ACTIVITY_TEMPLATES.get(tag, []):
+                        pool.append({"activity": act.format(city=city_name), "structured": False})
+            pool.extend([
+                {"activity": f"Explore {city_name}'s neighborhoods on foot", "structured": False},
+                {"activity": f"Relax at a local café in {city_name}", "structured": False},
+                {"activity": f"Free time to wander and discover {city_name}", "structured": False},
+            ])
 
         for d in range(city["days_allocated"]):
             day_activities = []
@@ -663,29 +802,46 @@ def build_itinerary(recommended, prefs):
             for t in times:
                 picked = None
                 for act in pool:
-                    if act not in used:
-                        picked = act
-                        used.add(act)
+                    act_key = act["activity"]
+                    if act_key not in used:
+                        picked = dict(act)
+                        picked["time"] = t
+                        used.add(act_key)
                         break
                 if not picked:
-                    picked = f"Free time in {city_name}"
-                day_activities.append({"time": t, "activity": picked})
+                    picked = {"time": t, "activity": f"Free time in {city_name}", "structured": False}
+                day_activities.append(picked)
 
             title = f"Day {day_counter}: {city_name}"
+            is_travel_day = False
             if d == 0 and i == 0:
                 title += " — Arrival"
             elif d == 0 and i > 0:
                 title += " — Travel Day"
+                is_travel_day = True
             elif d == city["days_allocated"] - 1 and i == len(all_cities) - 1:
                 title += " — Final Day"
 
-            itinerary.append({
+            day_entry = {
                 "day": day_counter,
                 "title": title,
                 "city": city_name,
                 "country": city["country"],
                 "activities": day_activities,
-            })
+            }
+
+            # Add transport info on travel days
+            if is_travel_day and i > 0:
+                prev_city = all_cities[i - 1]["name"]
+                transport = get_transport_between(prev_city, city_name)
+                day_entry["transport"] = {
+                    "from": prev_city,
+                    "to": city_name,
+                    **transport,
+                }
+                transport_legs.append(day_entry["transport"])
+
+            itinerary.append(day_entry)
             day_counter += 1
 
     total_cost = 0
@@ -701,12 +857,17 @@ def build_itinerary(recommended, prefs):
             "total": city_total,
         })
 
+    # Add transport costs to total
+    transport_total = sum(t.get("cost", 0) for t in transport_legs)
+    total_cost += transport_total * group_size
+
     return {
         "itinerary": itinerary,
         "cities": all_cities,
         "budget_breakdown": budget_breakdown,
         "total_cost": total_cost,
         "trip_days": trip_days,
+        "transport_legs": transport_legs,
     }
 
 
@@ -923,6 +1084,57 @@ def inject_css():
     }
     .cost-stat .val { font-size: 1.4rem; font-weight: 700; color: #4361ee; }
     .cost-stat .lbl { font-size: 0.78rem; color: #888; }
+    .visa-badge {
+        display: inline-block; padding: 4px 14px; border-radius: 20px;
+        font-size: 0.82rem; font-weight: 600; margin: 2px 4px;
+    }
+    .visa-free { background: #d4edda; color: #155724; }
+    .visa-arrival { background: #fff3cd; color: #856404; }
+    .visa-evisa { background: #ffe0b2; color: #e65100; }
+    .visa-embassy { background: #f8d7da; color: #721c24; }
+    .transport-card {
+        background: linear-gradient(135deg, #f0f4ff, #e8f4f8); border-radius: 12px;
+        padding: 14px 18px; margin: 8px 0; border-left: 4px solid #2ec4b6;
+        display: flex; align-items: center; gap: 12px;
+    }
+    .transport-icon { font-size: 1.5rem; }
+    .transport-details { flex: 1; }
+    .transport-details .route { font-weight: 600; color: #1a1a2e; font-size: 0.95rem; }
+    .transport-details .info { color: #666; font-size: 0.85rem; }
+    .practical-card {
+        background: white; border-radius: 12px; padding: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 12px;
+    }
+    .practical-card h4 { color: #1a1a2e; margin: 0 0 10px; font-size: 1.1rem; }
+    .practical-item {
+        display: flex; justify-content: space-between; padding: 6px 0;
+        border-bottom: 1px solid #f0f0f0; font-size: 0.9rem;
+    }
+    .practical-item .label { color: #888; font-weight: 500; }
+    .practical-item .value { color: #333; font-weight: 600; }
+    .packing-category {
+        background: #f8f9fa; border-radius: 12px; padding: 16px;
+        margin-bottom: 12px;
+    }
+    .packing-category h4 { color: #4361ee; margin: 0 0 10px; font-size: 1rem; }
+    .activity-details {
+        background: #f8f9fa; border-radius: 10px; padding: 10px 14px;
+        margin: 4px 0; border-left: 3px solid #4361ee;
+    }
+    .activity-details .act-name { font-weight: 600; color: #1a1a2e; font-size: 0.92rem; }
+    .activity-details .act-meta { color: #666; font-size: 0.8rem; margin-top: 2px; }
+    .maps-link {
+        color: #4361ee; text-decoration: none; font-size: 0.8rem; font-weight: 500;
+    }
+    .maps-link:hover { text-decoration: underline; }
+    .search-link-btn {
+        display: inline-block; padding: 6px 16px; border-radius: 8px;
+        font-size: 0.85rem; font-weight: 600; text-decoration: none;
+        margin: 4px 6px 4px 0;
+    }
+    .flight-link { background: #e3f2fd; color: #1565c0; }
+    .hotel-link { background: #fff3e0; color: #e65100; }
+    .airbnb-link { background: #fce4ec; color: #c62828; }
     </style>""", unsafe_allow_html=True)
 
 
@@ -1791,6 +2003,174 @@ def explore_screen():
             st.rerun()
 
 
+# ── PDF Export ─────────────────────────────────────────────────────────────────
+def _pdf_safe(text):
+    """Strip non-latin1 characters for PDF rendering."""
+    replacements = {
+        "\u2014": "-", "\u2013": "-", "\u2018": "'", "\u2019": "'",
+        "\u201c": '"', "\u201d": '"', "\u2026": "...", "\u00a0": " ",
+        "\u2022": "*", "\u2192": "->", "\u2190": "<-",
+    }
+    for k, v in replacements.items():
+        text = text.replace(k, v)
+    return text.encode("latin-1", errors="replace").decode("latin-1")
+
+
+def generate_pdf_itinerary(results, prefs):
+    """Generate a PDF itinerary using fpdf2."""
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=20)
+
+    # ── Title Page ──
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 28)
+    pdf.cell(0, 40, "", ln=True)
+    pdf.cell(0, 15, "Your Travel Itinerary", ln=True, align="C")
+    pdf.set_font("Helvetica", "", 14)
+    pdf.set_text_color(100, 100, 100)
+    dep_city = prefs.get("departure_city", "New York")
+    cities_str = " > ".join(c["name"] for c in results["cities"])
+    pdf.cell(0, 10, _pdf_safe(f"From {dep_city}"), ln=True, align="C")
+    pdf.cell(0, 8, _pdf_safe(cities_str), ln=True, align="C")
+    pdf.cell(0, 8, f'{results["trip_days"]} days | Est. ${results["total_cost"]:,}', ln=True, align="C")
+    start_date = prefs.get("start_date", date.today() + timedelta(days=30))
+    if isinstance(start_date, str):
+        start_date = date.fromisoformat(start_date)
+    end_date = start_date + timedelta(days=results["trip_days"])
+    pdf.cell(0, 8, f'{start_date.strftime("%B %d, %Y")} - {end_date.strftime("%B %d, %Y")}', ln=True, align="C")
+    pdf.set_text_color(0, 0, 0)
+
+    # ── Trip Overview ──
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.cell(0, 12, "Trip Overview", ln=True)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.ln(4)
+
+    recommended = results.get("recommended", [])
+    for country_info in recommended:
+        country = country_info["country"]
+        sample = country_info["cities"][0]["data"]
+        visa = sample.get("visa_status", "unknown").replace("_", " ").title()
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(0, 9, _pdf_safe(f"{country} - {visa}"), ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        for city in country_info["cities"]:
+            alloc = next((c["days_allocated"] for c in results["cities"] if c["name"] == city["name"]), "?")
+            pdf.cell(0, 7, _pdf_safe(f"  {city['name']} - {alloc} days (~${city['data']['cost']}/day pp)"), ln=True)
+        pdf.ln(3)
+
+    # ── Day-by-Day ──
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.cell(0, 12, "Day-by-Day Itinerary", ln=True)
+    pdf.ln(4)
+
+    for day in results["itinerary"]:
+        if "transport" in day:
+            t = day["transport"]
+            pdf.set_font("Helvetica", "I", 10)
+            pdf.set_text_color(80, 80, 80)
+            pdf.cell(0, 7, _pdf_safe(f"  >> {t.get('name', t['mode'])} from {t['from']} to {t['to']} "
+                     f"(~{t.get('duration', '?')}h, ~${t.get('cost', '?')})"), ln=True)
+            pdf.set_text_color(0, 0, 0)
+
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 9, _pdf_safe(day["title"]), ln=True)
+        pdf.set_font("Helvetica", "", 10)
+
+        for a in day["activities"]:
+            activity_text = a.get("activity", "")
+            if a.get("structured"):
+                line = f"  {a['time']}: {activity_text}"
+                if a.get("address"):
+                    line += f" [{a['address']}]"
+                if a.get("cost"):
+                    line += f" ({a['cost']})"
+            else:
+                line = f"  {a['time']}: {activity_text}"
+            safe_line = _pdf_safe(line)
+            if len(safe_line) > 120:
+                safe_line = safe_line[:117] + "..."
+            pdf.cell(0, 6, safe_line, ln=True)
+        pdf.ln(3)
+
+        if pdf.get_y() > 250:
+            pdf.add_page()
+
+    # ── Budget ──
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.cell(0, 12, "Budget Breakdown", ln=True)
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "", 11)
+    group_size = {"Solo": 1, "Couple": 2, "Group": 4, "Family": 4}.get(prefs.get("group", "Solo"), 2)
+    pdf.cell(0, 7, f"Group size: {group_size} | Budget: ${prefs.get('budget', 3000):,} | "
+             f"Estimated: ${results['total_cost']:,}", ln=True)
+    pdf.ln(4)
+
+    for item in results["budget_breakdown"]:
+        pdf.cell(0, 7, _pdf_safe(f"  {item['city']} ({item['country']}): {item['days']}d x "
+                 f"${item['daily_pp']}/pp = ${item['total']:,}"), ln=True)
+
+    transport_legs = results.get("transport_legs", [])
+    if transport_legs:
+        pdf.ln(4)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, "Transport Costs", ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        for leg in transport_legs:
+            pdf.cell(0, 7, _pdf_safe(f"  {leg['from']} -> {leg['to']}: {leg.get('name', '')} ~${leg.get('cost', 0)} pp"), ln=True)
+
+    # ── Practical Info ──
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.cell(0, 12, "Practical Info", ln=True)
+    pdf.ln(4)
+
+    seen_countries = set()
+    for country_info in recommended:
+        country = country_info["country"]
+        if country in seen_countries:
+            continue
+        seen_countries.add(country)
+        sample = country_info["cities"][0]["data"]
+
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(0, 9, country, ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        info_items = [
+            f"Visa: {sample.get('visa_status', '?').replace('_', ' ').title()} (max {sample.get('visa_max_stay', '?')} days)",
+            f"Currency: {sample.get('currency_name', '?')} ({sample.get('currency', '?')}) {sample.get('currency_symbol', '')}",
+            f"Power: {sample.get('plug_type', '?')}",
+            f"Tipping: {sample.get('tipping', '?')}",
+            f"Emergency: {sample.get('emergency_number', '?')}",
+            f"SIM: {sample.get('sim_info', '?')}",
+            f"Tap Water: {sample.get('tap_water', '?')}",
+            f"Dress Code: {sample.get('dress_code', '?')}",
+        ]
+        for info in info_items:
+            pdf.cell(0, 6, _pdf_safe(f"  {info}"), ln=True)
+        pdf.ln(4)
+
+    # ── Packing List ──
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.cell(0, 12, "Packing List", ln=True)
+    pdf.ln(4)
+
+    packing = generate_packing_list(results["cities"], results["trip_days"], prefs.get("interests", []))
+    for category, items in packing.items():
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, _pdf_safe(category), ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        for item in items:
+            pdf.cell(0, 6, _pdf_safe(f"  [ ] {item}"), ln=True)
+        pdf.ln(3)
+
+    return pdf.output()
+
+
 # ── Results Screen ─────────────────────────────────────────────────────────────
 def results_screen():
     results = st.session_state.results
@@ -1803,7 +2183,7 @@ def results_screen():
         unsafe_allow_html=True,
     )
 
-    nc1, nc2, nc3, nc4 = st.columns([1, 1, 1, 1])
+    nc1, nc2, nc3, nc4, nc5 = st.columns([1, 1, 1, 1, 1])
     with nc1:
         if st.button("← Edit Preferences", key="back_to_wizard"):
             st.session_state.screen = "wizard"
@@ -1834,6 +2214,15 @@ def results_screen():
         if st.button("🧰 Tools", key="to_tools_results"):
             st.session_state.screen = "tools"
             st.rerun()
+    with nc5:
+        pdf_bytes = generate_pdf_itinerary(results, prefs)
+        st.download_button(
+            label="📄 Download PDF",
+            data=pdf_bytes,
+            file_name="travel_itinerary.pdf",
+            mime="application/pdf",
+            key="download_pdf",
+        )
 
     st.markdown("")
 
@@ -1858,16 +2247,54 @@ def results_screen():
     st.markdown("")
 
     # ── Tabs ──
-    tab_overview, tab_itinerary, tab_map, tab_budget = st.tabs(
-        ["📋 Overview", "📅 Day-by-Day Itinerary", "🗺️ Route Map", "💰 Budget Breakdown"]
+    tab_overview, tab_itinerary, tab_map, tab_budget, tab_practical, tab_packing = st.tabs(
+        ["📋 Overview", "📅 Day-by-Day", "🗺️ Route Map", "💰 Budget", "🌐 Practical Info", "🧳 Packing List"]
     )
 
     # ── Overview Tab ──
     with tab_overview:
+        # Flight search links at top
+        dep_city = prefs.get("departure_city", "New York")
+        start_date = prefs.get("start_date", date.today() + timedelta(days=30))
+        if isinstance(start_date, str):
+            start_date = date.fromisoformat(start_date)
+        end_date = start_date + timedelta(days=results["trip_days"])
+        first_dest = results["cities"][0]["name"] if results["cities"] else ""
+        last_dest = results["cities"][-1]["name"] if results["cities"] else ""
+
+        outbound_url = generate_flight_search_url(dep_city, first_dest, start_date.isoformat())
+        return_url = generate_flight_search_url(last_dest, dep_city, end_date.isoformat())
+
+        st.markdown(
+            f'<div style="background:#f0f4ff;border-radius:12px;padding:16px;margin-bottom:16px;">'
+            f'<strong>✈️ Search Flights</strong><br>'
+            f'<a href="{outbound_url}" target="_blank" class="search-link-btn flight-link">'
+            f'Outbound: {dep_city} → {first_dest} ({start_date.strftime("%b %d")})</a>'
+            f'<a href="{return_url}" target="_blank" class="search-link-btn flight-link">'
+            f'Return: {last_dest} → {dep_city} ({end_date.strftime("%b %d")})</a>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
         for country_info in recommended:
             reason = generate_country_reason(country_info, prefs)
+
+            # Visa badge
+            sample_city = country_info["cities"][0]["data"]
+            visa_status = sample_city.get("visa_status", "unknown")
+            visa_max = sample_city.get("visa_max_stay", 0)
+            visa_notes = sample_city.get("visa_notes", "")
+            visa_class = {"visa_free": "visa-free", "visa_on_arrival": "visa-arrival",
+                          "e_visa": "visa-evisa", "embassy_visa": "visa-embassy"}.get(visa_status, "visa-evisa")
+            visa_label = {"visa_free": "Visa Free", "visa_on_arrival": "Visa on Arrival",
+                          "e_visa": "E-Visa Required", "embassy_visa": "Embassy Visa"}.get(visa_status, visa_status.replace("_", " ").title())
+            visa_html = f'<span class="visa-badge {visa_class}">{visa_label}'
+            if visa_max:
+                visa_html += f' · {visa_max} days'
+            visa_html += '</span>'
+
             st.markdown(f'<div class="result-card">'
-                        f'<div class="country-header">🇺🇳 {country_info["country"]}</div>'
+                        f'<div class="country-header">🇺🇳 {country_info["country"]} {visa_html}</div>'
                         f'<p style="color:#555;margin-bottom:12px;">{reason}</p>',
                         unsafe_allow_html=True)
 
@@ -1881,13 +2308,25 @@ def results_screen():
                     highlights = " · ".join(city["data"].get("highlights", [])[:4])
                     desc = city["data"].get("description", "")[:100]
                     alloc = next((c["days_allocated"] for c in results["cities"] if c["name"] == city["name"]), "?")
+
+                    # Hotel search links
+                    city_start = start_date
+                    city_end = start_date + timedelta(days=alloc if isinstance(alloc, int) else 3)
+                    hotel_urls = generate_hotel_search_urls(city["name"], country_info["country"],
+                                                           city_start.isoformat(), city_end.isoformat())
+                    hotel_html = (
+                        f'<a href="{hotel_urls["booking"]}" target="_blank" class="search-link-btn hotel-link">Hotels</a>'
+                        f'<a href="{hotel_urls["airbnb"]}" target="_blank" class="search-link-btn airbnb-link">Airbnb</a>'
+                    )
+
                     st.markdown(
                         f'<div style="background:#f8f9fa;border-radius:12px;padding:16px;">'
                         f'<strong style="font-size:1.1rem;">{city["name"]}</strong><br>'
                         f'<span style="color:#888;font-size:0.85rem;">{alloc} days · ~${city["data"]["cost"]}/day pp</span><br>'
                         f'<div style="margin:8px 0;">{tags_html}</div>'
                         f'<span style="color:#666;font-size:0.82rem;">{highlights}</span><br>'
-                        f'<span style="color:#999;font-size:0.78rem;font-style:italic;">{desc}</span>'
+                        f'<span style="color:#999;font-size:0.78rem;font-style:italic;">{desc}</span><br>'
+                        f'<div style="margin-top:8px;">{hotel_html}</div>'
                         f'</div>',
                         unsafe_allow_html=True,
                     )
@@ -1905,6 +2344,23 @@ def results_screen():
         st.markdown(f"### Your {results['trip_days']}-Day Itinerary")
         current_city = None
         for day in results["itinerary"]:
+            # Transport card between cities
+            if "transport" in day:
+                t = day["transport"]
+                mode_icon = {"flight": "✈️", "train": "🚆", "bus": "🚌", "ferry": "⛴️"}.get(t["mode"], "🚐")
+                cost_str = f"~${t['cost']}" if t.get("cost") else ""
+                dur_str = f"{t['duration']}h" if t.get("duration") else ""
+                st.markdown(
+                    f'<div class="transport-card">'
+                    f'<span class="transport-icon">{mode_icon}</span>'
+                    f'<div class="transport-details">'
+                    f'<div class="route">{t["from"]} → {t["to"]}</div>'
+                    f'<div class="info">{t.get("name", t["mode"].title())} · {dur_str} · {cost_str}</div>'
+                    f'<div class="info" style="font-size:0.8rem;color:#999;">{t.get("notes", "")}</div>'
+                    f'</div></div>',
+                    unsafe_allow_html=True,
+                )
+
             if day["city"] != current_city:
                 current_city = day["city"]
                 st.markdown(f"---")
@@ -1912,11 +2368,36 @@ def results_screen():
 
             acts_html = ""
             for a in day["activities"]:
-                acts_html += (
-                    f'<div class="activity-item">'
-                    f'<span class="activity-time">{a["time"]}</span> {a["activity"]}'
-                    f'</div>'
-                )
+                if a.get("structured"):
+                    # Rich activity card with address, hours, cost, maps link
+                    meta_parts = []
+                    if a.get("address"):
+                        meta_parts.append(f"📍 {a['address']}")
+                    if a.get("hours"):
+                        meta_parts.append(f"🕐 {a['hours']}")
+                    if a.get("cost"):
+                        meta_parts.append(f"💰 {a['cost']}")
+                    meta_str = " · ".join(meta_parts)
+                    maps_html = ""
+                    if a.get("maps_url"):
+                        maps_html = f' · <a href="{a["maps_url"]}" target="_blank" class="maps-link">📍 Open in Maps</a>'
+                    desc_html = ""
+                    if a.get("description"):
+                        desc_html = f'<div style="color:#888;font-size:0.78rem;margin-top:2px;">{a["description"]}</div>'
+                    acts_html += (
+                        f'<div class="activity-details">'
+                        f'<span class="activity-time">{a["time"]}</span>'
+                        f'<span class="act-name">{a["activity"]}</span>'
+                        f'<div class="act-meta">{meta_str}{maps_html}</div>'
+                        f'{desc_html}'
+                        f'</div>'
+                    )
+                else:
+                    acts_html += (
+                        f'<div class="activity-item">'
+                        f'<span class="activity-time">{a["time"]}</span> {a["activity"]}'
+                        f'</div>'
+                    )
 
             st.markdown(
                 f'<div class="day-card">'
@@ -2118,8 +2599,85 @@ def results_screen():
             )
 
         st.markdown("")
+        # Add transport costs if any
+        transport_legs = results.get("transport_legs", [])
+        if transport_legs:
+            st.markdown("#### Transport Between Cities")
+            for leg in transport_legs:
+                mode_icon = {"flight": "✈️", "train": "🚆", "bus": "🚌", "ferry": "⛴️"}.get(leg["mode"], "🚐")
+                st.markdown(
+                    f'{mode_icon} **{leg["from"]} → {leg["to"]}** — {leg.get("name", "")} · '
+                    f'~${leg.get("cost", 0)} pp · {leg.get("duration", "?")}h'
+                )
+            transport_total = sum(t.get("cost", 0) for t in transport_legs)
+            st.markdown(f"**Transport subtotal:** ${transport_total * group_size:,} ({group_size}p)")
+            st.markdown("")
+
         st.caption("Estimates are for mid-range travel and cover accommodation, food, activities, and local transport. "
                    "International flights are not included.")
+
+    # ── Practical Info Tab ──
+    with tab_practical:
+        st.markdown("### Practical Travel Info")
+        st.markdown("*Essential info for US passport holders*")
+        st.markdown("")
+
+        seen_countries = set()
+        for country_info in recommended:
+            country = country_info["country"]
+            if country in seen_countries:
+                continue
+            seen_countries.add(country)
+
+            sample = country_info["cities"][0]["data"]
+
+            # Visa info
+            visa_status = sample.get("visa_status", "unknown")
+            visa_class = {"visa_free": "visa-free", "visa_on_arrival": "visa-arrival",
+                          "e_visa": "visa-evisa", "embassy_visa": "visa-embassy"}.get(visa_status, "visa-evisa")
+            visa_label = {"visa_free": "Visa Free", "visa_on_arrival": "Visa on Arrival",
+                          "e_visa": "E-Visa Required", "embassy_visa": "Embassy Visa"}.get(visa_status, "Unknown")
+
+            st.markdown(f'<div class="practical-card">'
+                        f'<h4>🇺🇳 {country} <span class="visa-badge {visa_class}">{visa_label}</span></h4>',
+                        unsafe_allow_html=True)
+
+            items = [
+                ("Visa", f'{visa_label} · Max {sample.get("visa_max_stay", "?")} days · {sample.get("visa_notes", "")}'),
+                ("Currency", f'{sample.get("currency_name", "?")} ({sample.get("currency", "?")}) {sample.get("currency_symbol", "")}'),
+                ("Power Plugs", sample.get("plug_type", "?")),
+                ("Tipping", sample.get("tipping", "?")),
+                ("Emergency", sample.get("emergency_number", "?")),
+                ("SIM Card", sample.get("sim_info", "?")),
+                ("Tap Water", sample.get("tap_water", "?")),
+                ("Dress Code", sample.get("dress_code", "?")),
+            ]
+            for label, value in items:
+                st.markdown(
+                    f'<div class="practical-item"><span class="label">{label}</span>'
+                    f'<span class="value">{value}</span></div>',
+                    unsafe_allow_html=True,
+                )
+
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Packing List Tab ──
+    with tab_packing:
+        st.markdown("### Smart Packing List")
+        st.markdown("*Customized for your destinations and activities*")
+        st.markdown("")
+
+        user_interests = prefs.get("interests", [])
+        packing = generate_packing_list(results["cities"], results["trip_days"], user_interests)
+
+        for category, items in packing.items():
+            st.markdown(f'<div class="packing-category"><h4>{category}</h4>', unsafe_allow_html=True)
+            for item in items:
+                st.checkbox(item, key=f"pack_{category}_{item}")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown("")
+        st.caption("This list is generated based on your destinations' weather, terrain, and your selected interests.")
 
 
 # ── Tools Screen ──────────────────────────────────────────────────────────────
