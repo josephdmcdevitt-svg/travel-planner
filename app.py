@@ -2017,116 +2017,371 @@ def _pdf_safe(text):
 
 
 def generate_pdf_itinerary(results, prefs):
-    """Generate a PDF itinerary using fpdf2."""
+    """Generate a polished, well-structured PDF travel itinerary."""
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=20)
+    W = 190  # usable width (210 - 10 - 10 margins)
 
-    # ── Title Page ──
-    pdf.add_page()
-    pdf.set_font("Helvetica", "B", 28)
-    pdf.cell(0, 40, "", ln=True)
-    pdf.cell(0, 15, "Your Travel Itinerary", ln=True, align="C")
-    pdf.set_font("Helvetica", "", 14)
-    pdf.set_text_color(100, 100, 100)
+    # Color palette
+    BLUE = (67, 97, 238)
+    DARK = (26, 26, 46)
+    TEAL = (46, 196, 182)
+    GRAY = (120, 120, 120)
+    LIGHT_BG = (248, 249, 250)
+    WHITE = (255, 255, 255)
+
+    def section_header(title):
+        pdf.set_fill_color(*BLUE)
+        pdf.set_text_color(*WHITE)
+        pdf.set_font("Helvetica", "B", 16)
+        pdf.cell(0, 12, f"  {_pdf_safe(title)}", ln=True, fill=True)
+        pdf.set_text_color(*DARK)
+        pdf.ln(6)
+
+    def sub_header(title):
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_text_color(*BLUE)
+        pdf.cell(0, 8, _pdf_safe(title), ln=True)
+        pdf.set_draw_color(*BLUE)
+        pdf.line(pdf.get_x(), pdf.get_y(), pdf.get_x() + W, pdf.get_y())
+        pdf.ln(3)
+        pdf.set_text_color(*DARK)
+
+    def info_row(label, value, indent=4):
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_text_color(*GRAY)
+        pdf.cell(indent, 6, "", ln=False)
+        pdf.cell(55, 6, _pdf_safe(label), ln=False)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(*DARK)
+        safe_val = _pdf_safe(str(value))
+        if len(safe_val) > 80:
+            safe_val = safe_val[:77] + "..."
+        pdf.cell(0, 6, safe_val, ln=True)
+
+    def gray_box_start():
+        pdf.set_fill_color(*LIGHT_BG)
+
+    def divider():
+        pdf.set_draw_color(220, 220, 220)
+        pdf.line(10, pdf.get_y(), 10 + W, pdf.get_y())
+        pdf.ln(2)
+
+    def page_check(needed=40):
+        if pdf.get_y() > 270 - needed:
+            pdf.add_page()
+
+    # ── Gather common data ──
     dep_city = prefs.get("departure_city", "New York")
-    cities_str = " > ".join(c["name"] for c in results["cities"])
-    pdf.cell(0, 10, _pdf_safe(f"From {dep_city}"), ln=True, align="C")
-    pdf.cell(0, 8, _pdf_safe(cities_str), ln=True, align="C")
-    pdf.cell(0, 8, f'{results["trip_days"]} days | Est. ${results["total_cost"]:,}', ln=True, align="C")
     start_date = prefs.get("start_date", date.today() + timedelta(days=30))
     if isinstance(start_date, str):
         start_date = date.fromisoformat(start_date)
     end_date = start_date + timedelta(days=results["trip_days"])
-    pdf.cell(0, 8, f'{start_date.strftime("%B %d, %Y")} - {end_date.strftime("%B %d, %Y")}', ln=True, align="C")
-    pdf.set_text_color(0, 0, 0)
+    group_size = {"Solo": 1, "Couple": 2, "Group": 4, "Family": 4}.get(prefs.get("group", "Solo"), 2)
+    recommended = results.get("recommended", [])
+    transport_legs = results.get("transport_legs", [])
 
-    # ── Trip Overview ──
+    # ══════════════════════════════════════════════════════════════════════════
+    # PAGE 1: TITLE PAGE
+    # ══════════════════════════════════════════════════════════════════════════
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 12, "Trip Overview", ln=True)
-    pdf.set_font("Helvetica", "", 11)
+
+    # Top accent bar
+    pdf.set_fill_color(*BLUE)
+    pdf.rect(0, 0, 210, 6, "F")
+
+    pdf.ln(35)
+    pdf.set_font("Helvetica", "B", 32)
+    pdf.set_text_color(*DARK)
+    pdf.cell(0, 16, "Travel Itinerary", ln=True, align="C")
+
+    pdf.set_draw_color(*TEAL)
+    pdf.set_line_width(0.8)
+    pdf.line(65, pdf.get_y() + 2, 145, pdf.get_y() + 2)
+    pdf.ln(10)
+
+    # Route line
+    pdf.set_font("Helvetica", "", 13)
+    pdf.set_text_color(*GRAY)
+    route_cities = [dep_city] + [c["name"] for c in results["cities"]]
+    route_str = "  ->  ".join(route_cities)
+    pdf.cell(0, 8, _pdf_safe(route_str), ln=True, align="C")
     pdf.ln(4)
 
-    recommended = results.get("recommended", [])
+    # Date and stats box
+    pdf.set_fill_color(*LIGHT_BG)
+    box_y = pdf.get_y()
+    pdf.rect(30, box_y, 150, 36, "F")
+    pdf.set_xy(30, box_y + 4)
+    pdf.set_font("Helvetica", "", 12)
+    pdf.set_text_color(*DARK)
+    pdf.cell(150, 8, f'{start_date.strftime("%B %d")} - {end_date.strftime("%B %d, %Y")}', ln=True, align="C")
+    pdf.set_x(30)
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_text_color(*BLUE)
+    pdf.cell(150, 10, f'{results["trip_days"]} Days  |  {len(recommended)} Countries  |  '
+             f'{len(results["cities"])} Cities', ln=True, align="C")
+    pdf.set_x(30)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.set_text_color(*GRAY)
+    group_label = prefs.get("group", "Solo")
+    pdf.cell(150, 8, f'Estimated Budget: ${results["total_cost"]:,} ({group_label})', ln=True, align="C")
+    pdf.ln(20)
+
+    # Quick reference box
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_text_color(*DARK)
+    pdf.cell(0, 7, "Quick Reference", ln=True)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(*GRAY)
+    countries_list = [c["country"] for c in recommended]
+    pdf.cell(0, 6, _pdf_safe(f"Countries: {', '.join(countries_list)}"), ln=True)
+    pdf.cell(0, 6, _pdf_safe(f"Departure: {dep_city}"), ln=True)
+    pdf.cell(0, 6, f"Group: {group_label} ({group_size} travelers)", ln=True)
+    pdf.cell(0, 6, _pdf_safe(f"Pace: {prefs.get('pace', 'Moderate')}"), ln=True)
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # PAGE 2: TRIP OVERVIEW
+    # ══════════════════════════════════════════════════════════════════════════
+    pdf.add_page()
+    section_header("Trip Overview")
+
     for country_info in recommended:
         country = country_info["country"]
         sample = country_info["cities"][0]["data"]
-        visa = sample.get("visa_status", "unknown").replace("_", " ").title()
-        pdf.set_font("Helvetica", "B", 13)
-        pdf.cell(0, 9, _pdf_safe(f"{country} - {visa}"), ln=True)
-        pdf.set_font("Helvetica", "", 10)
+        visa_raw = sample.get("visa_status", "unknown")
+        visa_label = visa_raw.replace("_", " ").title()
+
+        page_check(50)
+        sub_header(f"{country}")
+
+        # Visa status line
+        pdf.set_font("Helvetica", "I", 9)
+        pdf.set_text_color(*GRAY)
+        visa_note = sample.get("visa_notes", "")
+        max_stay = sample.get("visa_max_stay", "?")
+        pdf.cell(0, 6, _pdf_safe(f"Visa: {visa_label} | Max stay: {max_stay} days | {visa_note}"), ln=True)
+        pdf.ln(2)
+
+        # Cities in this country
         for city in country_info["cities"]:
+            cd = city["data"]
             alloc = next((c["days_allocated"] for c in results["cities"] if c["name"] == city["name"]), "?")
-            pdf.cell(0, 7, _pdf_safe(f"  {city['name']} - {alloc} days (~${city['data']['cost']}/day pp)"), ln=True)
-        pdf.ln(3)
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.set_text_color(*DARK)
+            pdf.cell(0, 7, _pdf_safe(f"{city['name']} - {alloc} days"), ln=True)
 
-    # ── Day-by-Day ──
+            pdf.set_font("Helvetica", "", 9)
+            pdf.set_text_color(*GRAY)
+            desc = cd.get("description", "")[:140]
+            pdf.cell(4, 5, "", ln=False)
+            pdf.cell(0, 5, _pdf_safe(desc), ln=True)
+
+            highlights = cd.get("highlights", [])[:5]
+            if highlights:
+                pdf.cell(4, 5, "", ln=False)
+                pdf.set_font("Helvetica", "", 8)
+                pdf.cell(0, 5, _pdf_safe("Highlights: " + " | ".join(highlights)), ln=True)
+
+            info_row("Daily cost", f"~${cd.get('cost', '?')}/day per person")
+            info_row("Airbnb avg", f"~${cd.get('airbnb_cost', '?')}/night")
+            pdf.ln(3)
+        divider()
+        pdf.ln(2)
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # DAY-BY-DAY ITINERARY
+    # ══════════════════════════════════════════════════════════════════════════
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 12, "Day-by-Day Itinerary", ln=True)
-    pdf.ln(4)
+    section_header("Day-by-Day Itinerary")
 
+    current_city = None
     for day in results["itinerary"]:
+        page_check(55)
+
+        # Transport card between cities
         if "transport" in day:
             t = day["transport"]
-            pdf.set_font("Helvetica", "I", 10)
-            pdf.set_text_color(80, 80, 80)
-            pdf.cell(0, 7, _pdf_safe(f"  >> {t.get('name', t['mode'])} from {t['from']} to {t['to']} "
-                     f"(~{t.get('duration', '?')}h, ~${t.get('cost', '?')})"), ln=True)
-            pdf.set_text_color(0, 0, 0)
+            mode_icons = {"flight": "[FLY]", "train": "[TRAIN]", "bus": "[BUS]", "ferry": "[FERRY]"}
+            mode_str = mode_icons.get(t["mode"], "[TRAVEL]")
+            pdf.set_fill_color(240, 244, 255)
+            box_y = pdf.get_y()
+            pdf.rect(10, box_y, W, 14, "F")
+            pdf.set_draw_color(*TEAL)
+            pdf.rect(10, box_y, 3, 14, "F")
+            pdf.set_xy(16, box_y + 1)
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_text_color(*TEAL)
+            pdf.cell(0, 6, _pdf_safe(f"{mode_str}  {t['from']} -> {t['to']}  |  "
+                     f"{t.get('name', t['mode'].title())}  |  ~{t.get('duration', '?')}h  |  ~${t.get('cost', '?')} pp"), ln=True)
+            pdf.set_xy(16, box_y + 7)
+            pdf.set_font("Helvetica", "I", 8)
+            pdf.set_text_color(*GRAY)
+            pdf.cell(0, 6, _pdf_safe(t.get("notes", "")), ln=True)
+            pdf.set_y(box_y + 16)
 
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 9, _pdf_safe(day["title"]), ln=True)
-        pdf.set_font("Helvetica", "", 10)
+        # City header when city changes
+        if day["city"] != current_city:
+            current_city = day["city"]
+            if pdf.get_y() > 30:
+                pdf.ln(2)
+            pdf.set_fill_color(*DARK)
+            pdf.set_text_color(*WHITE)
+            pdf.set_font("Helvetica", "B", 11)
+            country_name = day.get("country", "")
+            pdf.cell(0, 9, _pdf_safe(f"  {current_city}, {country_name}"), ln=True, fill=True)
+            pdf.set_text_color(*DARK)
+            pdf.ln(2)
 
+        # Day title bar
+        pdf.set_fill_color(*LIGHT_BG)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(*BLUE)
+        pdf.cell(0, 8, _pdf_safe(f"  {day['title']}"), ln=True, fill=True)
+        pdf.set_text_color(*DARK)
+
+        # Activities
         for a in day["activities"]:
+            page_check(20)
             activity_text = a.get("activity", "")
+            time_slot = a.get("time", "")
+
             if a.get("structured"):
-                line = f"  {a['time']}: {activity_text}"
+                # Rich activity with details
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.cell(4, 5, "", ln=False)
+                pdf.set_text_color(*BLUE)
+                pdf.cell(22, 5, _pdf_safe(time_slot), ln=False)
+                pdf.set_text_color(*DARK)
+                act_name = _pdf_safe(activity_text)
+                if len(act_name) > 70:
+                    act_name = act_name[:67] + "..."
+                pdf.cell(0, 5, act_name, ln=True)
+
+                # Address + cost + hours on a detail line
+                detail_parts = []
                 if a.get("address"):
-                    line += f" [{a['address']}]"
+                    addr = a["address"]
+                    if len(addr) > 50:
+                        addr = addr[:47] + "..."
+                    detail_parts.append(addr)
+                if a.get("hours"):
+                    detail_parts.append(a["hours"])
                 if a.get("cost"):
-                    line += f" ({a['cost']})"
+                    detail_parts.append(a["cost"])
+                if detail_parts:
+                    pdf.set_font("Helvetica", "", 8)
+                    pdf.set_text_color(*GRAY)
+                    pdf.cell(26, 4, "", ln=False)
+                    detail_str = _pdf_safe("  |  ".join(detail_parts))
+                    if len(detail_str) > 90:
+                        detail_str = detail_str[:87] + "..."
+                    pdf.cell(0, 4, detail_str, ln=True)
+                    pdf.set_text_color(*DARK)
             else:
-                line = f"  {a['time']}: {activity_text}"
-            safe_line = _pdf_safe(line)
-            if len(safe_line) > 120:
-                safe_line = safe_line[:117] + "..."
-            pdf.cell(0, 6, safe_line, ln=True)
+                # Simple activity
+                pdf.set_font("Helvetica", "", 9)
+                pdf.cell(4, 5, "", ln=False)
+                pdf.set_text_color(*BLUE)
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.cell(22, 5, _pdf_safe(time_slot), ln=False)
+                pdf.set_text_color(*DARK)
+                pdf.set_font("Helvetica", "", 9)
+                act_text = _pdf_safe(activity_text)
+                if len(act_text) > 85:
+                    act_text = act_text[:82] + "..."
+                pdf.cell(0, 5, act_text, ln=True)
+
         pdf.ln(3)
 
-        if pdf.get_y() > 250:
-            pdf.add_page()
-
-    # ── Budget ──
+    # ══════════════════════════════════════════════════════════════════════════
+    # BUDGET BREAKDOWN
+    # ══════════════════════════════════════════════════════════════════════════
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 12, "Budget Breakdown", ln=True)
-    pdf.ln(4)
-    pdf.set_font("Helvetica", "", 11)
-    group_size = {"Solo": 1, "Couple": 2, "Group": 4, "Family": 4}.get(prefs.get("group", "Solo"), 2)
-    pdf.cell(0, 7, f"Group size: {group_size} | Budget: ${prefs.get('budget', 3000):,} | "
-             f"Estimated: ${results['total_cost']:,}", ln=True)
-    pdf.ln(4)
+    section_header("Budget Breakdown")
 
+    # Summary boxes
+    budget = prefs.get("budget", 3000)
+    total = results["total_cost"]
+    remaining = budget - total
+
+    # Three metric boxes side by side
+    box_w = W / 3 - 2
+    y_start = pdf.get_y()
+
+    for i, (label, amount, color) in enumerate([
+        ("Your Budget", f"${budget:,}", BLUE),
+        ("Estimated Cost", f"${total:,}", TEAL),
+        ("Remaining", f"${remaining:,}", (40, 167, 69) if remaining >= 0 else (220, 53, 69)),
+    ]):
+        x = 10 + i * (box_w + 3)
+        pdf.set_fill_color(*color)
+        pdf.rect(x, y_start, box_w, 22, "F")
+        pdf.set_xy(x, y_start + 3)
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_text_color(*WHITE)
+        pdf.cell(box_w, 8, amount, align="C")
+        pdf.set_xy(x, y_start + 12)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.cell(box_w, 6, label, align="C")
+
+    pdf.set_y(y_start + 28)
+    pdf.set_text_color(*DARK)
+
+    # Cost per city table
+    sub_header("Accommodation & Daily Costs")
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_fill_color(*LIGHT_BG)
+    pdf.cell(55, 7, "  City", ln=False, fill=True)
+    pdf.cell(35, 7, "Country", ln=False, fill=True)
+    pdf.cell(25, 7, "Days", ln=False, fill=True, align="C")
+    pdf.cell(35, 7, "Daily/pp", ln=False, fill=True, align="C")
+    pdf.cell(40, 7, "Subtotal", ln=True, fill=True, align="R")
+
+    pdf.set_font("Helvetica", "", 9)
     for item in results["budget_breakdown"]:
-        pdf.cell(0, 7, _pdf_safe(f"  {item['city']} ({item['country']}): {item['days']}d x "
-                 f"${item['daily_pp']}/pp = ${item['total']:,}"), ln=True)
+        pdf.cell(55, 6, _pdf_safe(f"  {item['city']}"), ln=False)
+        pdf.cell(35, 6, _pdf_safe(item["country"]), ln=False)
+        pdf.cell(25, 6, str(item["days"]), ln=False, align="C")
+        pdf.cell(35, 6, f"${item['daily_pp']}", ln=False, align="C")
+        pdf.cell(40, 6, f"${item['total']:,}", ln=True, align="R")
+        divider()
 
-    transport_legs = results.get("transport_legs", [])
+    pdf.ln(2)
+
+    # Transport costs
     if transport_legs:
-        pdf.ln(4)
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 8, "Transport Costs", ln=True)
-        pdf.set_font("Helvetica", "", 10)
-        for leg in transport_legs:
-            pdf.cell(0, 7, _pdf_safe(f"  {leg['from']} -> {leg['to']}: {leg.get('name', '')} ~${leg.get('cost', 0)} pp"), ln=True)
+        sub_header("Inter-City Transport")
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_fill_color(*LIGHT_BG)
+        pdf.cell(70, 7, "  Route", ln=False, fill=True)
+        pdf.cell(50, 7, "Mode", ln=False, fill=True)
+        pdf.cell(35, 7, "Duration", ln=False, fill=True, align="C")
+        pdf.cell(35, 7, "Cost/pp", ln=True, fill=True, align="R")
 
-    # ── Practical Info ──
+        pdf.set_font("Helvetica", "", 9)
+        for leg in transport_legs:
+            pdf.cell(70, 6, _pdf_safe(f"  {leg['from']} -> {leg['to']}"), ln=False)
+            pdf.cell(50, 6, _pdf_safe(leg.get("name", leg.get("mode", "?").title())), ln=False)
+            pdf.cell(35, 6, f"~{leg.get('duration', '?')}h", ln=False, align="C")
+            pdf.cell(35, 6, f"~${leg.get('cost', 0)}", ln=True, align="R")
+            divider()
+
+        transport_total = sum(t.get("cost", 0) for t in transport_legs)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(155, 7, "Transport Total:", ln=False, align="R")
+        pdf.cell(35, 7, f"${transport_total * group_size:,}", ln=True, align="R")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # PRACTICAL INFO
+    # ══════════════════════════════════════════════════════════════════════════
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 12, "Practical Info", ln=True)
+    section_header("Practical Travel Info")
+    pdf.set_font("Helvetica", "I", 9)
+    pdf.set_text_color(*GRAY)
+    pdf.cell(0, 6, "Essential information for US passport holders", ln=True)
     pdf.ln(4)
+    pdf.set_text_color(*DARK)
 
     seen_countries = set()
     for country_info in recommended:
@@ -2136,37 +2391,70 @@ def generate_pdf_itinerary(results, prefs):
         seen_countries.add(country)
         sample = country_info["cities"][0]["data"]
 
-        pdf.set_font("Helvetica", "B", 13)
-        pdf.cell(0, 9, country, ln=True)
-        pdf.set_font("Helvetica", "", 10)
-        info_items = [
-            f"Visa: {sample.get('visa_status', '?').replace('_', ' ').title()} (max {sample.get('visa_max_stay', '?')} days)",
-            f"Currency: {sample.get('currency_name', '?')} ({sample.get('currency', '?')}) {sample.get('currency_symbol', '')}",
-            f"Power: {sample.get('plug_type', '?')}",
-            f"Tipping: {sample.get('tipping', '?')}",
-            f"Emergency: {sample.get('emergency_number', '?')}",
-            f"SIM: {sample.get('sim_info', '?')}",
-            f"Tap Water: {sample.get('tap_water', '?')}",
-            f"Dress Code: {sample.get('dress_code', '?')}",
-        ]
-        for info in info_items:
-            pdf.cell(0, 6, _pdf_safe(f"  {info}"), ln=True)
-        pdf.ln(4)
+        page_check(70)
+        sub_header(country)
 
-    # ── Packing List ──
+        info_row("Visa Status", sample.get("visa_status", "?").replace("_", " ").title())
+        info_row("Max Stay", f'{sample.get("visa_max_stay", "?")} days')
+        info_row("Visa Notes", sample.get("visa_notes", ""))
+        divider()
+        info_row("Currency", f'{sample.get("currency_name", "?")} ({sample.get("currency", "?")}) {sample.get("currency_symbol", "")}')
+        info_row("Power Plugs", sample.get("plug_type", "?"))
+        info_row("Tipping", sample.get("tipping", "?"))
+        divider()
+        info_row("Emergency #", sample.get("emergency_number", "?"))
+        info_row("SIM Cards", sample.get("sim_info", "?"))
+        info_row("Tap Water", sample.get("tap_water", "?"))
+        info_row("Dress Code", sample.get("dress_code", "?"))
+        pdf.ln(6)
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # PACKING LIST
+    # ══════════════════════════════════════════════════════════════════════════
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 12, "Packing List", ln=True)
+    section_header("Packing Checklist")
+    pdf.set_font("Helvetica", "I", 9)
+    pdf.set_text_color(*GRAY)
+    pdf.cell(0, 6, "Customized for your destinations, weather, and activities", ln=True)
     pdf.ln(4)
+    pdf.set_text_color(*DARK)
 
     packing = generate_packing_list(results["cities"], results["trip_days"], prefs.get("interests", []))
+
+    # Render in 2 columns
+    col_items = []
     for category, items in packing.items():
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 8, _pdf_safe(category), ln=True)
-        pdf.set_font("Helvetica", "", 10)
+        col_items.append(("header", category))
         for item in items:
-            pdf.cell(0, 6, _pdf_safe(f"  [ ] {item}"), ln=True)
-        pdf.ln(3)
+            col_items.append(("item", item))
+        col_items.append(("spacer", ""))
+
+    for entry_type, text in col_items:
+        page_check(10)
+        if entry_type == "header":
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_text_color(*BLUE)
+            pdf.cell(0, 8, _pdf_safe(text), ln=True)
+            pdf.set_text_color(*DARK)
+        elif entry_type == "item":
+            pdf.set_font("Helvetica", "", 9)
+            # Draw checkbox
+            x, y = pdf.get_x() + 4, pdf.get_y()
+            pdf.rect(x, y + 0.5, 4, 4)
+            pdf.cell(12, 5, "", ln=False)
+            pdf.cell(0, 5, _pdf_safe(text), ln=True)
+        else:
+            pdf.ln(2)
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # FOOTER ON LAST PAGE
+    # ══════════════════════════════════════════════════════════════════════════
+    pdf.ln(10)
+    divider()
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.set_text_color(*GRAY)
+    pdf.cell(0, 5, f"Generated on {date.today().strftime('%B %d, %Y')} by Travel Planner", ln=True, align="C")
+    pdf.cell(0, 5, "Prices are estimates. Always verify visa requirements with official sources before travel.", ln=True, align="C")
 
     return pdf.output()
 
