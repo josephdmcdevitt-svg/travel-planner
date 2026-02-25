@@ -10,7 +10,11 @@ import io
 from datetime import date, timedelta
 from urllib.parse import quote
 from cities import CITIES, TRANSPORT_ROUTES
-from fpdf import FPDF
+try:
+    from fpdf import FPDF
+    HAS_FPDF = True
+except ImportError:
+    HAS_FPDF = False
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Travel Planner", page_icon="🌍", layout="wide")
@@ -1652,6 +1656,7 @@ def wizard_screen():
                     result = build_itinerary(recommended, prefs)
                     result["recommended"] = recommended
                     st.session_state.results = result
+                    st.session_state.pop("pdf_ready", None)
                     st.session_state.screen = "results"
                     st.rerun()
 
@@ -1999,6 +2004,7 @@ def explore_screen():
             results = build_itinerary(recommended, quick_prefs)
             results["recommended"] = recommended
             st.session_state.results = results
+            st.session_state.pop("pdf_ready", None)
             st.session_state.screen = "results"
             st.rerun()
 
@@ -2018,6 +2024,8 @@ def _pdf_safe(text):
 
 def generate_pdf_itinerary(results, prefs):
     """Generate a polished, well-structured PDF travel itinerary."""
+    if not HAS_FPDF:
+        return None
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=20)
     W = 190  # usable width (210 - 10 - 10 margins)
@@ -2456,7 +2464,10 @@ def generate_pdf_itinerary(results, prefs):
     pdf.cell(0, 5, f"Generated on {date.today().strftime('%B %d, %Y')} by Travel Planner", ln=True, align="C")
     pdf.cell(0, 5, "Prices are estimates. Always verify visa requirements with official sources before travel.", ln=True, align="C")
 
-    return bytes(pdf.output())
+    # Return as BytesIO — the only type guaranteed to work across all Streamlit versions
+    buf = io.BytesIO(pdf.output())
+    buf.seek(0)
+    return buf
 
 
 # ── Results Screen ─────────────────────────────────────────────────────────────
@@ -2493,6 +2504,7 @@ def results_screen():
                 new_result = build_itinerary(new_rec, prefs)
                 new_result["recommended"] = new_rec
                 st.session_state.results = new_result
+                st.session_state.pop("pdf_ready", None)
             st.rerun()
     with nc3:
         if st.button("🗺️ Explore Map", key="to_explore_from_results"):
@@ -2503,17 +2515,21 @@ def results_screen():
             st.session_state.screen = "tools"
             st.rerun()
     with nc5:
-        try:
-            pdf_bytes = generate_pdf_itinerary(results, prefs)
-            st.download_button(
-                label="📄 Download PDF",
-                data=pdf_bytes,
-                file_name="travel_itinerary.pdf",
-                mime="application/pdf",
-                key="download_pdf",
-            )
-        except Exception:
-            st.button("📄 PDF unavailable", disabled=True, key="pdf_err")
+        if HAS_FPDF:
+            if st.button("📄 Generate PDF", key="gen_pdf"):
+                try:
+                    pdf_buf = generate_pdf_itinerary(results, prefs)
+                    st.session_state["pdf_ready"] = pdf_buf
+                except Exception:
+                    st.session_state["pdf_ready"] = None
+            if st.session_state.get("pdf_ready"):
+                st.download_button(
+                    label="📥 Download PDF",
+                    data=st.session_state["pdf_ready"],
+                    file_name="travel_itinerary.pdf",
+                    mime="application/pdf",
+                    key="download_pdf",
+                )
 
     st.markdown("")
 
